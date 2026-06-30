@@ -1,4 +1,6 @@
 samsungtvws
 wakeonlan
 flask
+flask-cors
 pyinstaller
+pytest

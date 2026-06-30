@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Splash Screen</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0a0a0f;
+      color: #ffffff;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      padding: 2rem;
+      background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0f 70%);
+    }
+
+    .rental-name {
+      font-size: 2.2rem;
+      font-weight: 300;
+      letter-spacing: 0.3rem;
+      text-transform: uppercase;
+      color: #8892b0;
+      margin-bottom: 3rem;
+    }
+
+    .unit-badge {
+      font-size: 6rem;
+      font-weight: 700;
+      color: #00d4ff;
+      text-shadow: 0 0 40px rgba(0, 212, 255, 0.4);
+      margin-bottom: 2rem;
+      line-height: 1;
+    }
+
+    .unit-label {
+      font-size: 1.5rem;
+      color: #8892b0;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2rem;
+    }
+
+    .customer-name {
+      font-size: 3.5rem;
+      font-weight: 600;
+      margin-bottom: 2rem;
+      color: #ffffff;
+    }
+
+    .duration-box {
+      border: 2px solid #00d4ff;
+      border-radius: 12px;
+      padding: 1.5rem 3rem;
+      margin-top: 1rem;
+    }
+
+    .duration-label {
+      font-size: 1.2rem;
+      color: #8892b0;
+      text-transform: uppercase;
+      letter-spacing: 0.15rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .duration-value {
+      font-size: 4rem;
+      font-weight: 700;
+      color: #00d4ff;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.1rem;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 2rem;
+      font-size: 1rem;
+      color: #4a5568;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="rental-name" id="rental-name">Rental PS Smart Billing</div>
+    <div class="unit-label">Unit</div>
+    <div class="unit-badge" id="unit">-</div>
+    <div class="customer-name" id="nama">-</div>
+    <div class="duration-box">
+      <div class="duration-label">Durasi Sesi</div>
+      <div class="duration-value" id="durasi">00:00:00</div>
+    </div>
+    <div class="footer">Selamat bermain!</div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+
+    document.getElementById("unit").textContent = params.get("unit") || "-";
+    document.getElementById("nama").textContent = params.get("nama") || "-";
+    document.getElementById("durasi").textContent = params.get("durasi") || "00:00:00";
+
+    const rental = params.get("rental");
+    if (rental) {
+      document.getElementById("rental-name").textContent = rental;
+    }
+
+    setTimeout(function () {
+      window.close();
+    }, 5000);
+  </script>
+</body>
+</html>
