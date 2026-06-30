@@ -1,0 +1,4 @@
+samsungtvws
+wakeonlan
+flask
+pyinstaller
