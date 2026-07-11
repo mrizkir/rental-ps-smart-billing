@@ -1,20 +1,6 @@
-import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from config import BASE_DIR
-from tv_controller import SamsungTVController, resolve_token_file
-
-
-class TestResolveTokenFile:
-    def test_relative_path_resolved_to_base_dir(self):
-        result = resolve_token_file("tv_token.txt")
-        assert result == os.path.join(BASE_DIR, "tv_token.txt")
-
-    def test_absolute_path_unchanged(self):
-        absolute = "/tmp/tv_token.txt"
-        assert resolve_token_file(absolute) == absolute
+from tv_controller import SamsungTVController
 
 
 class TestSamsungTVController:
@@ -36,13 +22,17 @@ class TestSamsungTVController:
     @patch("tv_controller.SamsungTVWS")
     def test_power_off_success(self, mock_tv_class, tv_controller):
         mock_tv = MagicMock()
+        mock_tv.token = "SSSDDFFG123"
         mock_tv_class.return_value = mock_tv
 
         result = tv_controller.power_off()
 
         mock_tv_class.assert_called_once()
+        kwargs = mock_tv_class.call_args.kwargs
+        assert kwargs.get("token") == "test-token"
         mock_tv.send_key.assert_called_once_with("KEY_POWER")
         assert result["success"] is True
+        assert result["token"] == "SSSDDFFG123"
 
     @patch("tv_controller.SamsungTVWS", side_effect=ConnectionError("refused"))
     def test_power_off_failure(self, mock_tv_class, tv_controller):
@@ -86,12 +76,16 @@ class TestSamsungTVController:
     def test_get_status_success(self, mock_tv_class, tv_controller):
         mock_tv = MagicMock()
         mock_tv.rest_device_info.return_value = {"device": {"name": "Samsung TV"}}
+        mock_tv.token = "NEWxxxx"
         mock_tv_class.return_value = mock_tv
 
         result = tv_controller.get_status()
 
         assert result["success"] is True
         assert result["data"]["device"]["name"] == "Samsung TV"
+        assert result["token"] == "NEWxxxx"
+        mock_tv.open.assert_called_once()
+        mock_tv.close.assert_called_once()
 
     @patch("tv_controller.SamsungTVWS", side_effect=TimeoutError("timeout"))
     def test_get_status_failure(self, mock_tv_class, tv_controller):
@@ -99,3 +93,11 @@ class TestSamsungTVController:
 
         assert result["success"] is False
         assert "TV not reachable" in result["message"]
+
+    def test_empty_token_normalized_to_none(self):
+        controller = SamsungTVController(
+            tv_ip="192.168.1.1",
+            tv_mac="AA:BB:CC:DD:EE:FF",
+            token="   ",
+        )
+        assert controller.token is None

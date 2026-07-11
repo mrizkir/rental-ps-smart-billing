@@ -3,18 +3,192 @@
         xmlns:vm="using:rental_ps_smart_billing.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1100" d:DesignHeight="700"
         x:Class="rental_ps_smart_billing.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="rental_ps_smart_billing">
+        Title="Rental PS Smart Billing"
+        Width="1100" Height="700"
+        WindowState="Maximized"
+        CanResize="False"
+        CanMinimize="False"
+        CanMaximize="False"
+        Background="#FAFAFA">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <DockPanel Margin="0">
+        <Menu DockPanel.Dock="Top" Background="#ECEFF1">
+            <MenuItem Header="_Pengguna"
+                      IsVisible="{Binding CanManageUsers}">
+                <MenuItem Header="_Daftar User"
+                          Command="{Binding ListUsersCommand}" />
+                <MenuItem Header="_Tambah User"
+                          Command="{Binding AddUserCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Smart TV"
+                      IsVisible="{Binding CanManageSettings}">
+                <MenuItem Header="_Daftar Smart TV"
+                          Command="{Binding ListSmartTvsCommand}" />
+                <MenuItem Header="_Tambah Smart TV"
+                          Command="{Binding AddSmartTvCommand}" />
+            </MenuItem>
+            <MenuItem Header="_Billing">
+                <MenuItem Header="_Refresh Dashboard"
+                          Command="{Binding RefreshDashboardCommand}" />
+            </MenuItem>
+        </Menu>
 
+        <Grid Margin="20" RowDefinitions="Auto,Auto,*,Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="Rental Management"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               Foreground="#1A237E" />
+                    <TextBlock Text="{Binding WelcomeMessage}" Foreground="#546E7A" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="2">
+                    <TextBlock Text="{Binding ClockDisplay}"
+                               Foreground="#37474F"
+                               HorizontalAlignment="Right" />
+                    <TextBlock Text="{Binding RoleLabel, StringFormat=Role: {0}}"
+                               Foreground="#78909C"
+                               HorizontalAlignment="Right" />
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Row="1"
+                       Margin="0,10,0,8"
+                       Text="{Binding StatusMessage}"
+                       Foreground="#1565C0"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Units}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UnitCardViewModel">
+                            <Border Margin="8"
+                                    Padding="14"
+                                    Background="White"
+                                    BorderBrush="#CFD8DC"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Width="260"
+                                    Height="240">
+                                <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
+                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding TvName}"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#263238"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <Border Grid.Column="1"
+                                                Padding="8,2"
+                                                CornerRadius="4"
+                                                Background="#E65100"
+                                                IsVisible="{Binding IsPlaying}">
+                                            <TextBlock Text="PLAYING"
+                                                       FontSize="11"
+                                                       FontWeight="Bold"
+                                                       Foreground="White" />
+                                        </Border>
+                                        <Border Grid.Column="1"
+                                                Padding="8,2"
+                                                CornerRadius="4"
+                                                Background="#2E7D32"
+                                                IsVisible="{Binding !IsPlaying}">
+                                            <TextBlock Text="AVAILABLE"
+                                                       FontSize="11"
+                                                       FontWeight="Bold"
+                                                       Foreground="White" />
+                                        </Border>
+                                    </Grid>
+
+                                    <TextBlock Grid.Row="1"
+                                               Margin="0,16,0,8"
+                                               Text="{Binding TimerDisplay}"
+                                               FontSize="28"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               Foreground="#E65100"
+                                               IsVisible="{Binding IsPlaying}" />
+                                    <TextBlock Grid.Row="1"
+                                               Margin="0,16,0,8"
+                                               Text="--:--:--"
+                                               FontSize="28"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               Foreground="#43A047"
+                                               IsVisible="{Binding !IsPlaying}" />
+
+                                    <StackPanel Grid.Row="2" Spacing="4">
+                                        <TextBlock Text="{Binding CustomerDisplay, StringFormat=Customer: {0}}"
+                                                   Foreground="#607D8B"
+                                                   FontSize="12" />
+                                        <TextBlock Text="{Binding PackageDisplay, StringFormat=Paket: {0}}"
+                                                   Foreground="#607D8B"
+                                                   FontSize="12" />
+                                    </StackPanel>
+
+                                    <Border Grid.Row="3"
+                                            Margin="0,8,0,10"
+                                            Padding="8,6"
+                                            Background="#FFF3E0"
+                                            CornerRadius="4">
+                                        <TextBlock Text="{Binding AmountDisplay}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#E65100"
+                                                   HorizontalAlignment="Center" />
+                                    </Border>
+
+                                    <Grid Grid.Row="4" ColumnDefinitions="*,*" ColumnSpacing="8"
+                                          IsVisible="{Binding IsPlaying}">
+                                        <Button Grid.Column="0"
+                                                Content="TAMBAH WAKTU"
+                                                Command="{Binding ExtendCommand}"
+                                                Height="34"
+                                                FontSize="11"
+                                                Background="#1565C0"
+                                                Foreground="White" />
+                                        <Button Grid.Column="1"
+                                                Content="BAYAR"
+                                                Command="{Binding PayCommand}"
+                                                Height="34"
+                                                FontSize="11"
+                                                Background="#C62828"
+                                                Foreground="White" />
+                                    </Grid>
+
+                                    <Button Grid.Row="4"
+                                            Content="START"
+                                            Command="{Binding StartCommand}"
+                                            Height="34"
+                                            FontWeight="SemiBold"
+                                            Background="#2E7D32"
+                                            Foreground="White"
+                                            IsVisible="{Binding !IsPlaying}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock Grid.Row="3"
+                       Margin="0,12,0,0"
+                       Text="Rental PS Smart Billing"
+                       Foreground="#999999"
+                       HorizontalAlignment="Center" />
+        </Grid>
+    </DockPanel>
 </Window>

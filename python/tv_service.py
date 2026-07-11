@@ -7,9 +7,9 @@ from config import (
     DEFAULT_PS4_MAC,
     DEFAULT_TV_IP,
     DEFAULT_TV_MAC,
-    DEFAULT_TV_TOKEN_FILE,
     FLASK_HOST,
     FLASK_PORT,
+    TV_WS_PORT,
 )
 from ps4_controller import PS4Controller
 from splash_server import SplashServer
@@ -28,16 +28,35 @@ splash_server = SplashServer()
 ps4_controller = PS4Controller()
 
 
+def _parse_ws_port(value) -> int:
+    if value is None or value == "":
+        return TV_WS_PORT
+    try:
+        port = int(value)
+        if 1 <= port <= 65535:
+            return port
+    except (TypeError, ValueError):
+        pass
+    return TV_WS_PORT
+
+
 def get_device_config() -> dict:
     data = request.get_json(silent=True) or {}
     if request.method == "GET":
         data = {**request.args.to_dict(), **data}
 
+    raw_token = data.get("tv_token")
+    if raw_token is None or raw_token == "":
+        token = None
+    else:
+        token = str(raw_token).strip() or None
+
     return {
         "tv_ip": data.get("tv_ip", DEFAULT_TV_IP),
         "tv_mac": data.get("tv_mac", DEFAULT_TV_MAC),
-        "tv_token_file": data.get("tv_token_file", DEFAULT_TV_TOKEN_FILE),
+        "tv_token": token,
         "ps4_mac": data.get("ps4_mac", DEFAULT_PS4_MAC),
+        "ws_port": _parse_ws_port(data.get("ws_port")),
     }
 
 
@@ -46,7 +65,8 @@ def get_tv_controller() -> SamsungTVController:
     return SamsungTVController(
         tv_ip=config["tv_ip"],
         tv_mac=config["tv_mac"],
-        token_file=config["tv_token_file"],
+        token=config["tv_token"],
+        ws_port=config["ws_port"],
     )
 
 

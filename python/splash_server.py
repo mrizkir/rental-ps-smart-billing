@@ -5,7 +5,7 @@ import socketserver
 import threading
 import urllib.parse
 
-from config import BASE_DIR, SPLASH_HOST, SPLASH_PORT, SPLASH_RENTAL_NAME
+from config import BASE_DIR, SPLASH_HOST, SPLASH_PORT, SPLASH_PUBLIC_IP, SPLASH_RENTAL_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -68,5 +68,6 @@ class SplashServer:
                 "rental": rental_name,
             }
         )
-        local_ip = get_local_ip()
-        return f"http://{local_ip}:{self.port}/splash.html?{params}"
+        # IP manual di config — TV harus reach PC di alamat ini
+        public_ip = (SPLASH_PUBLIC_IP or "").strip() or get_local_ip()
+        return f"http://{public_ip}:{self.port}/splash.html?{params}"

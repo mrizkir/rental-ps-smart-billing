@@ -47,7 +47,7 @@ class TestSplashServer:
         assert server.is_running is False
 
     def test_get_url_contains_params(self, server):
-        with patch("splash_server.get_local_ip", return_value="192.168.1.50"):
+        with patch("splash_server.SPLASH_PUBLIC_IP", "192.168.1.50"):
             url = server.get_url(unit=1, durasi="01:00:00", nama="Budi")
 
         assert url.startswith("http://192.168.1.50:")
@@ -58,10 +58,17 @@ class TestSplashServer:
         assert "Smart" in url
         assert "Billing" in url
 
+    def test_get_url_falls_back_to_local_ip_when_public_empty(self, server):
+        with patch("splash_server.SPLASH_PUBLIC_IP", ""):
+            with patch("splash_server.get_local_ip", return_value="10.0.0.8"):
+                url = server.get_url(unit=1, durasi="1 Jam", nama="Budi")
+
+        assert url.startswith("http://10.0.0.8:")
+
     def test_serves_splash_html(self, server):
         server.start()
 
-        with patch("splash_server.get_local_ip", return_value="127.0.0.1"):
+        with patch("splash_server.SPLASH_PUBLIC_IP", "127.0.0.1"):
             url = server.get_url(unit=2, durasi="02:00:00", nama="Andi")
 
         with urllib.request.urlopen(url, timeout=5) as response:

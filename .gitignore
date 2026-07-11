@@ -69,3 +69,4 @@ python/venv/
 app/bin/
 app/obj/
 *.user
+app/appsettings.local.json

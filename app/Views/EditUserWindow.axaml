@@ -1,0 +1,95 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:rental_ps_smart_billing.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="460" d:DesignHeight="560"
+        x:Class="rental_ps_smart_billing.Views.EditUserWindow"
+        x:DataType="vm:EditUserViewModel"
+        Title="Edit User"
+        Width="460" Height="560"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#ECEFF1">
+
+    <Border Margin="20"
+            Padding="24"
+            Background="White"
+            CornerRadius="10">
+        <StackPanel Spacing="14">
+            <TextBlock Text="Edit User"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Foreground="#1A237E" />
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Username" Foreground="#37474F" FontWeight="Medium" />
+                <TextBox Text="{Binding Username}"
+                         IsReadOnly="True"
+                         Background="#F5F5F5" />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Nama Tampilan" Foreground="#37474F" FontWeight="Medium" />
+                <TextBox Text="{Binding DisplayName}"
+                         IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Role" Foreground="#37474F" FontWeight="Medium" />
+                <ComboBox ItemsSource="{Binding Roles}"
+                          SelectedItem="{Binding SelectedRole}"
+                          IsEnabled="{Binding !IsBusy}"
+                          HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <CheckBox Content="Aktif"
+                      IsChecked="{Binding IsActive}"
+                      IsEnabled="{Binding !IsBusy}" />
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Password Baru (opsional)" Foreground="#37474F" FontWeight="Medium" />
+                <TextBox Text="{Binding Password}"
+                         PasswordChar="●"
+                         PlaceholderText="Kosongkan jika tidak diubah"
+                         IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Konfirmasi Password Baru" Foreground="#37474F" FontWeight="Medium" />
+                <TextBox Text="{Binding ConfirmPassword}"
+                         PasswordChar="●"
+                         PlaceholderText="Ulangi password baru"
+                         IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="#C62828"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+                <Button Grid.Column="0"
+                        Content="Batal"
+                        Command="{Binding CancelCommand}"
+                        Height="36"
+                        IsEnabled="{Binding !IsBusy}" />
+                <Button Grid.Column="1"
+                        Content="Simpan"
+                        Command="{Binding SaveCommand}"
+                        Height="36"
+                        Background="#1565C0"
+                        Foreground="White"
+                        FontWeight="SemiBold"
+                        IsEnabled="{Binding !IsBusy}" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

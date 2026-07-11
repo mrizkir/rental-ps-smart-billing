@@ -1,0 +1,110 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:rental_ps_smart_billing.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="500" d:DesignHeight="700"
+        x:Class="rental_ps_smart_billing.Views.AddSmartTvWindow"
+        x:DataType="vm:AddSmartTvViewModel"
+        Title="Tambah Smart TV"
+        Width="500" Height="700"
+        MinWidth="480" MinHeight="560"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="#ECEFF1">
+
+    <Border Margin="16"
+            Padding="20"
+            Background="White"
+            CornerRadius="10">
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
+                <TextBlock Text="{Binding TestMessage}"
+                           Foreground="#1565C0"
+                           TextWrapping="Wrap"
+                           MaxHeight="72"
+                           IsVisible="{Binding TestMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="#C62828"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <Button Content="Test Koneksi"
+                        Command="{Binding TestConnectionCommand}"
+                        Height="36"
+                        HorizontalAlignment="Stretch"
+                        IsEnabled="{Binding !IsBusy}" />
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <Button Grid.Column="0"
+                            Content="Batal"
+                            Command="{Binding CancelCommand}"
+                            Height="36"
+                            IsEnabled="{Binding !IsBusy}" />
+                    <Button Grid.Column="1"
+                            Content="Simpan"
+                            Command="{Binding SaveCommand}"
+                            Height="36"
+                            Background="#1565C0"
+                            Foreground="White"
+                            FontWeight="SemiBold"
+                            IsEnabled="{Binding !IsBusy}" />
+                </Grid>
+            </StackPanel>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Tambah Smart TV"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="#1A237E" />
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Nama TV" Foreground="#37474F" FontWeight="Medium" />
+                        <TextBox Text="{Binding Name}"
+                                 PlaceholderText="contoh: TV Ruang A"
+                                 IsEnabled="{Binding !IsBusy}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Merek" Foreground="#37474F" FontWeight="Medium" />
+                        <ComboBox ItemsSource="{Binding Brands}"
+                                  SelectedItem="{Binding SelectedBrand}"
+                                  IsEnabled="{Binding !IsBusy}"
+                                  HorizontalAlignment="Stretch" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="IP Address" Foreground="#37474F" FontWeight="Medium" />
+                        <TextBox Text="{Binding IpAddress}"
+                                 PlaceholderText="contoh: 192.168.1.100"
+                                 IsEnabled="{Binding !IsBusy}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="MAC Address" Foreground="#37474F" FontWeight="Medium" />
+                        <TextBox Text="{Binding MacAddress}"
+                                 PlaceholderText="contoh: 80:8A:BD:9B:3C:02"
+                                 IsEnabled="{Binding !IsBusy}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Port WebSocket" Foreground="#37474F" FontWeight="Medium" />
+                        <TextBox Text="{Binding WsPortText}"
+                                 PlaceholderText="8002"
+                                 IsEnabled="{Binding !IsBusy}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Token Pairing (opsional)" Foreground="#37474F" FontWeight="Medium" />
+                        <TextBox Text="{Binding PairingToken, Mode=TwoWay}"
+                                 PlaceholderText="Kosongkan jika belum pairing; terisi otomatis setelah test"
+                                 IsEnabled="{Binding !IsBusy}" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</Window>

@@ -1,0 +1,83 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:rental_ps_smart_billing.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="420" d:DesignHeight="400"
+        x:Class="rental_ps_smart_billing.Views.LoginWindow"
+        x:DataType="vm:LoginViewModel"
+        Title="Login - Rental PS Smart Billing"
+        Width="420" Height="400"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="#ECEFF1"
+        Icon="/Assets/avalonia-logo.ico">
+
+    <Border Margin="24"
+            Padding="28"
+            Background="White"
+            CornerRadius="12"
+            BoxShadow="0 4 16 0 #30000000">
+        <StackPanel Spacing="16">
+            <TextBlock Text="Rental PS Smart Billing"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       Foreground="#1A237E"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="Masuk ke akun Anda"
+                       Foreground="#546E7A"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,8" />
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Username"
+                           Foreground="#37474F"
+                           FontWeight="Medium" />
+                <TextBox Text="{Binding Username}"
+                         PlaceholderText="Masukkan username"
+                         Background="White"
+                         Foreground="#212121"
+                         BorderBrush="#B0BEC5"
+                         IsEnabled="{Binding !IsBusy}"
+                         Height="36"
+                         Padding="10,8" />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Password"
+                           Foreground="#37474F"
+                           FontWeight="Medium" />
+                <TextBox Text="{Binding Password}"
+                         PasswordChar="●"
+                         PlaceholderText="Masukkan password"
+                         Background="White"
+                         Foreground="#212121"
+                         BorderBrush="#B0BEC5"
+                         IsEnabled="{Binding !IsBusy}"
+                         Height="36"
+                         Padding="10,8" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="#C62828"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <Button Content="Login"
+                    Command="{Binding LoginCommand}"
+                    HorizontalAlignment="Stretch"
+                    Height="40"
+                    Background="#1565C0"
+                    Foreground="White"
+                    FontWeight="SemiBold"
+                    CornerRadius="6"
+                    IsEnabled="{Binding !IsBusy}" />
+
+            <TextBlock Text="Memproses..."
+                       Foreground="#546E7A"
+                       HorizontalAlignment="Center"
+                       IsVisible="{Binding IsBusy}" />
+        </StackPanel>
+    </Border>
+</Window>

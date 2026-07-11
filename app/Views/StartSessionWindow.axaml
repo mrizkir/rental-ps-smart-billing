@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:rental_ps_smart_billing.ViewModels"
+        xmlns:models="using:rental_ps_smart_billing.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="420" d:DesignHeight="360"
+        x:Class="rental_ps_smart_billing.Views.StartSessionWindow"
+        x:DataType="vm:StartSessionViewModel"
+        Title="{Binding Title}"
+        Width="420" Height="360"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#ECEFF1">
+
+    <Border Margin="16" Padding="20" Background="White" CornerRadius="10">
+        <StackPanel Spacing="14">
+            <TextBlock Text="{Binding Title}"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Foreground="#1A237E" />
+
+            <TextBlock Text="{Binding TvName, StringFormat=Unit: {0}}"
+                       Foreground="#546E7A" />
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Paket" Foreground="#37474F" FontWeight="Medium" />
+                <ComboBox ItemsSource="{Binding Packages}"
+                          SelectedItem="{Binding SelectedPackage}"
+                          HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:BillingPackage">
+                            <TextBlock Text="{Binding DisplayLabel}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Spacing="6" IsVisible="{Binding ShowCustomerField}">
+                <TextBlock Text="Nama Customer" Foreground="#37474F" FontWeight="Medium" />
+                <TextBox Text="{Binding CustomerName}"
+                         PlaceholderText="Guest" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="#C62828"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+                <Button Grid.Column="0"
+                        Content="Batal"
+                        Command="{Binding CancelCommand}"
+                        Height="36" />
+                <Button Grid.Column="1"
+                        Content="OK"
+                        Command="{Binding ConfirmCommand}"
+                        Height="36"
+                        Background="#1565C0"
+                        Foreground="White"
+                        FontWeight="SemiBold" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

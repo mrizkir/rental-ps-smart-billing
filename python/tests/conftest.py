@@ -8,7 +8,7 @@ def tv_controller():
     return SamsungTVController(
         tv_ip="192.168.100.92",
         tv_mac="80:8a:bd:9b:3c:02",
-        token_file="tv_token.txt",
+        token="test-token",
     )
 
 
