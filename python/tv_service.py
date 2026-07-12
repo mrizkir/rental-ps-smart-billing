@@ -1,12 +1,10 @@
 import logging
+from typing import Optional
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import (
-    DEFAULT_PS4_MAC,
-    DEFAULT_TV_IP,
-    DEFAULT_TV_MAC,
     FLASK_HOST,
     FLASK_PORT,
     TV_WS_PORT,
@@ -40,34 +38,47 @@ def _parse_ws_port(value) -> int:
     return TV_WS_PORT
 
 
+def _optional_str(value) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def get_device_config() -> dict:
     data = request.get_json(silent=True) or {}
     if request.method == "GET":
         data = {**request.args.to_dict(), **data}
 
-    raw_token = data.get("tv_token")
-    if raw_token is None or raw_token == "":
-        token = None
-    else:
-        token = str(raw_token).strip() or None
-
     return {
-        "tv_ip": data.get("tv_ip", DEFAULT_TV_IP),
-        "tv_mac": data.get("tv_mac", DEFAULT_TV_MAC),
-        "tv_token": token,
-        "ps4_mac": data.get("ps4_mac", DEFAULT_PS4_MAC),
+        "tv_ip": _optional_str(data.get("tv_ip")),
+        "tv_mac": _optional_str(data.get("tv_mac")),
+        "tv_token": _optional_str(data.get("tv_token")),
+        "ps4_mac": _optional_str(data.get("ps4_mac")),
         "ws_port": _parse_ws_port(data.get("ws_port")),
     }
 
 
 def get_tv_controller() -> SamsungTVController:
     config = get_device_config()
+    missing = [name for name in ("tv_ip", "tv_mac") if not config[name]]
+    if missing:
+        raise ValueError(f"Missing required field(s): {', '.join(missing)}")
+
     return SamsungTVController(
         tv_ip=config["tv_ip"],
         tv_mac=config["tv_mac"],
         token=config["tv_token"],
         ws_port=config["ws_port"],
     )
+
+
+def _tv_action(action, *, failure_status: int = 500):
+    try:
+        result = action(get_tv_controller())
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+    return jsonify(result), 200 if result["success"] else failure_status
 
 
 @app.route("/health", methods=["GET"])
@@ -79,22 +90,19 @@ def health():
 @app.route("/tv/power-on", methods=["POST"])
 def tv_power_on():
     logger.info("TV power-on requested")
-    result = get_tv_controller().power_on()
-    return jsonify(result), 200 if result["success"] else 500
+    return _tv_action(lambda tv: tv.power_on())
 
 
 @app.route("/tv/power-off", methods=["POST"])
 def tv_power_off():
     logger.info("TV power-off requested")
-    result = get_tv_controller().power_off()
-    return jsonify(result), 200 if result["success"] else 500
+    return _tv_action(lambda tv: tv.power_off())
 
 
 @app.route("/tv/set-hdmi", methods=["POST"])
 def tv_set_hdmi():
     logger.info("TV set-hdmi requested")
-    result = get_tv_controller().set_hdmi()
-    return jsonify(result), 200 if result["success"] else 500
+    return _tv_action(lambda tv: tv.set_hdmi())
 
 
 @app.route("/tv/send-key", methods=["POST"])
@@ -105,8 +113,7 @@ def tv_send_key():
         return jsonify({"success": False, "message": "Missing required field: key"}), 400
 
     logger.info("TV send-key requested: %s", key)
-    result = get_tv_controller().send_key(key)
-    return jsonify(result), 200 if result["success"] else 500
+    return _tv_action(lambda tv: tv.send_key(key))
 
 
 @app.route("/tv/open-browser", methods=["POST"])
@@ -117,20 +124,23 @@ def tv_open_browser():
         return jsonify({"success": False, "message": "Missing required field: url"}), 400
 
     logger.info("TV open-browser requested: %s", url)
-    result = get_tv_controller().open_browser(url)
-    return jsonify(result), 200 if result["success"] else 500
+    return _tv_action(lambda tv: tv.open_browser(url))
 
 
 @app.route("/tv/status", methods=["GET"])
 def tv_status():
     logger.info("TV status requested")
-    result = get_tv_controller().get_status()
-    return jsonify(result), 200 if result["success"] else 503
+    return _tv_action(lambda tv: tv.get_status(), failure_status=503)
 
 
 @app.route("/ps4/power-on", methods=["POST"])
 def ps4_power_on():
     config = get_device_config()
+    if not config["ps4_mac"]:
+        return jsonify(
+            {"success": False, "message": "Missing required field: ps4_mac"}
+        ), 400
+
     logger.info("PS4 power-on requested")
     result = ps4_controller.power_on(config["ps4_mac"])
     return jsonify(result), 200 if result["success"] else 500
@@ -162,6 +172,8 @@ def splash_show():
             result["url"] = url
 
         return jsonify(result), 200 if result["success"] else 500
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
     except Exception as exc:
         logger.exception("Failed to show splash screen")
         return jsonify({"success": False, "message": f"Splash show failed: {exc}"}), 500

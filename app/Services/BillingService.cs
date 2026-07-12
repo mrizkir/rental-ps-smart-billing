@@ -84,27 +84,30 @@ public sealed class BillingService : IBillingService
         AppLog.Info($"Session started: TV={tv.Name}, package={package.Name}, customer={name}");
 
         string? warning = null;
+        var token = tv.Token;
 
         var powerOn = await _tvApi.PowerOnAsync(
-            tv.IpAddress, tv.MacAddress, tv.WsPort, tv.Token, cancellationToken);
+            tv.IpAddress, tv.MacAddress, tv.WsPort, token, cancellationToken);
+        token = await PersistTokenAsync(smartTvId, token, powerOn, cancellationToken);
         if (!powerOn.Success)
+        {
             warning = $"Sesi dibuat, tetapi power-on gagal: {powerOn.Message}";
+            return BillingResult.Succeeded(warning);
+        }
 
         var splash = await _tvApi.ShowSplashAsync(
             tv.IpAddress,
             tv.MacAddress,
             tv.WsPort,
-            tv.Token,
+            token,
             tv.Name,
             package.Name,
             name,
             cancellationToken);
+        token = await PersistTokenAsync(smartTvId, token, splash, cancellationToken);
 
         if (!splash.Success)
-        {
-            var splashWarn = $"Splash gagal: {splash.Message}";
-            warning = warning is null ? splashWarn : $"{warning}; {splashWarn}";
-        }
+            warning = $"Splash gagal: {splash.Message}";
 
         return BillingResult.Succeeded(warning);
     }
@@ -141,6 +144,7 @@ public sealed class BillingService : IBillingService
                 package.Name,
                 session.CustomerName ?? "Guest",
                 cancellationToken);
+            await PersistTokenAsync(tv.Id, tv.Token, splash, cancellationToken);
 
             if (!splash.Success)
                 warning = $"Waktu ditambah, tetapi splash gagal: {splash.Message}";
@@ -167,12 +171,32 @@ public sealed class BillingService : IBillingService
         {
             var powerOff = await _tvApi.PowerOffAsync(
                 tv.IpAddress, tv.MacAddress, tv.WsPort, tv.Token, cancellationToken);
+            await PersistTokenAsync(tv.Id, tv.Token, powerOff, cancellationToken);
             if (!powerOff.Success)
                 warning = $"Sesi selesai, tetapi power-off gagal: {powerOff.Message}";
         }
 
         AppLog.Info($"Session ended: id={sessionId}, amount={amount}");
         return BillingResult.Succeeded(warning);
+    }
+
+    /// <summary>
+    /// Samsung often rotates the pairing token on each WebSocket connect.
+    /// Persist the latest token so the next call reuses it.
+    /// </summary>
+    private async Task<string?> PersistTokenAsync(
+        int smartTvId,
+        string? currentToken,
+        TvConnectionTestResult result,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(result.Token)
+            || string.Equals(result.Token, currentToken, StringComparison.Ordinal))
+            return currentToken;
+
+        await _smartTvs.UpdateTokenAsync(smartTvId, result.Token, cancellationToken);
+        AppLog.Info($"Smart TV token updated: id={smartTvId}");
+        return result.Token;
     }
 
     public async Task AutoEndExpiredAsync(CancellationToken cancellationToken = default)

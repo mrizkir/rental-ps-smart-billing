@@ -181,8 +181,7 @@ public sealed class SmartTvService : ISmartTvService
         var status = result.Success ? "success" : "failed";
         await _repository.UpdateTestResultAsync(id, status, result.Message, cancellationToken);
 
-        if (result.Success
-            && !string.IsNullOrWhiteSpace(result.Token)
+        if (!string.IsNullOrWhiteSpace(result.Token)
             && !string.Equals(result.Token, tv.Token, StringComparison.Ordinal))
         {
             await _repository.UpdateTokenAsync(id, result.Token, cancellationToken);

@@ -4,7 +4,8 @@ from tv_controller import SamsungTVController
 
 
 @pytest.fixture
-def tv_controller():
+def tv_controller(tmp_path, monkeypatch):
+    monkeypatch.setattr("tv_controller.TOKENS_DIR", str(tmp_path))
     return SamsungTVController(
         tv_ip="192.168.100.92",
         tv_mac="80:8a:bd:9b:3c:02",

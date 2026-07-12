@@ -179,7 +179,7 @@ class TestSplashEndpoint:
 
 class TestDeviceConfig:
     @patch("tv_service.SamsungTVController")
-    def test_custom_tv_ip_from_body(self, mock_controller_class, flask_client):
+    def test_tv_ip_and_mac_from_body(self, mock_controller_class, flask_client):
         mock_instance = MagicMock()
         mock_instance.power_on.return_value = {"success": True, "message": "ok"}
         mock_controller_class.return_value = mock_instance
@@ -193,3 +193,18 @@ class TestDeviceConfig:
         kwargs = mock_controller_class.call_args.kwargs
         assert kwargs["tv_ip"] == "10.0.0.5"
         assert kwargs["tv_mac"] == "11:22:33:44:55:66"
+
+    def test_tv_power_on_missing_ip_mac(self, flask_client):
+        response = flask_client.post("/tv/power-on", json={})
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data["success"] is False
+        assert "tv_ip" in data["message"]
+        assert "tv_mac" in data["message"]
+
+    def test_ps4_power_on_missing_mac(self, flask_client):
+        response = flask_client.post("/ps4/power-on", json={})
+
+        assert response.status_code == 400
+        assert "ps4_mac" in response.get_json()["message"]

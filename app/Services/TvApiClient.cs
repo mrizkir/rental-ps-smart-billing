@@ -47,7 +47,8 @@ public sealed class TvApiClient : ITvApiClient, IDisposable
         _httpClient = new HttpClient
         {
             BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"),
-            Timeout = TimeSpan.FromSeconds(30)
+            // power-on waits for Wake-on-LAN readiness (up to ~30s)
+            Timeout = TimeSpan.FromSeconds(60)
         };
     }
 
@@ -196,12 +197,28 @@ public sealed class TvApiClient : ITvApiClient, IDisposable
             ? msgProp.GetString() ?? string.Empty
             : string.Empty;
         var returnedToken = root.TryGetProperty("token", out var tokenProp)
-            ? tokenProp.GetString()
+            ? ReadTokenValue(tokenProp)
             : null;
 
         return success
             ? TvConnectionTestResult.Succeeded(message, returnedToken)
-            : TvConnectionTestResult.Failed(message);
+            : new TvConnectionTestResult
+            {
+                Success = false,
+                Message = message,
+                TestedAt = DateTime.UtcNow,
+                Token = string.IsNullOrWhiteSpace(returnedToken) ? null : returnedToken
+            };
+    }
+
+    private static string? ReadTokenValue(JsonElement tokenProp)
+    {
+        return tokenProp.ValueKind switch
+        {
+            JsonValueKind.String => tokenProp.GetString(),
+            JsonValueKind.Number => tokenProp.GetRawText(),
+            _ => null
+        };
     }
 
     public void Dispose() => _httpClient.Dispose();

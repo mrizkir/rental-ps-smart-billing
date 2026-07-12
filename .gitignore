@@ -63,6 +63,7 @@ python/dist/
 python/build/
 python/*.spec
 python/tv_token.txt
+python/tokens/
 python/venv/
 
 # .NET
