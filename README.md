@@ -12,6 +12,8 @@ Aplikasi desktop (.NET) mengelola data kasir dan master Smart TV. Kontrol TV fis
 | Python | 3.10+ |
 | SQL Server | 2019+ (atau SQL Server di Docker) |
 
+Unduh **.NET SDK 9**: [https://dotnet.microsoft.com/download/dotnet/9.0](https://dotnet.microsoft.com/download/dotnet/9.0) — pilih **SDK** (bukan Runtime), lalu installer sesuai OS (Windows x64 / macOS / Linux).
+
 Pastikan PC kasir dan TV Samsung berada di **jaringan LAN yang sama**.
 
 ---
