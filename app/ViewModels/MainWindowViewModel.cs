@@ -14,6 +14,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ISessionService _session;
     private readonly IUserService _userService;
     private readonly ISmartTvService _smartTvService;
+    private readonly IBillingPackageService _packageService;
     private readonly IBillingService _billingService;
     private readonly DispatcherTimer _timer;
     private Window? _ownerWindow;
@@ -24,18 +25,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ISessionService session,
         IUserService userService,
         ISmartTvService smartTvService,
+        IBillingPackageService packageService,
         IBillingService billingService)
     {
         _session = session;
         _userService = userService;
         _smartTvService = smartTvService;
+        _packageService = packageService;
         _billingService = billingService;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += OnTimerTick;
     }
 
-    public MainWindowViewModel() : this(new SessionService(), null!, null!, null!)
+    public MainWindowViewModel() : this(new SessionService(), null!, null!, null!, null!)
     {
     }
 
@@ -124,6 +127,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _isRefreshing = true;
         try
         {
+            foreach (var unit in expired)
+                unit.MarkStopped();
+
             await _billingService.AutoEndExpiredAsync();
             await LoadDashboardAsync();
         }
@@ -191,9 +197,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (_ownerWindow is null || !CanEndSession || unit.SessionId is null)
             return;
 
+        if (unit.IsOpenEnded)
+        {
+            StatusMessage = "Sesi Free Play tidak bisa ditambah waktu. Gunakan BAYAR.";
+            return;
+        }
+
         try
         {
-            var packages = await _billingService.GetPackagesAsync();
+            var packages = await _billingService.GetFixedPackagesAsync();
+            if (packages.Count == 0)
+            {
+                StatusMessage = "Tidak ada paket tetap untuk menambah waktu.";
+                return;
+            }
+
             var dialog = new StartSessionWindow();
             var vm = new StartSessionViewModel(
                 unit.TvName,
@@ -233,21 +251,39 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (_ownerWindow is null || !CanEndSession || unit.SessionId is null)
             return;
 
+        var confirmMessage = unit.IsOpenEnded
+            ? $"Akhiri Free Play {unit.TvName}? Estimasi tagihan {unit.AmountDisplay} (dihitung ulang saat bayar). TV akan dimatikan."
+            : $"Akhiri sesi {unit.TvName}? Total {unit.AmountDisplay}. TV akan dimatikan.";
+
         var confirmed = await DialogHelper.ConfirmAsync(
             _ownerWindow,
             "Bayar / Akhiri Sesi",
-            $"Akhiri sesi {unit.TvName}? Total {unit.AmountDisplay}. TV akan dimatikan.");
+            confirmMessage);
 
         if (!confirmed)
             return;
 
+        var sessionId = unit.SessionId.Value;
+        var tvName = unit.TvName;
+        // Stop timer/UI immediately — power-off TV can take tens of seconds.
+        unit.MarkStopped();
+
         try
         {
             IsBusy = true;
-            var result = await _billingService.EndSessionAsync(unit.SessionId.Value);
-            StatusMessage = result.Success
-                ? (result.WarningMessage ?? $"Sesi selesai: {unit.TvName} — {unit.AmountDisplay}")
-                : (result.ErrorMessage ?? "Gagal mengakhiri sesi.");
+            var result = await _billingService.EndSessionAsync(sessionId);
+            if (result.Success)
+            {
+                var total = result.Amount is decimal amount
+                    ? $"Rp {amount:N0}"
+                    : unit.AmountDisplay;
+                StatusMessage = result.WarningMessage
+                    ?? $"Sesi selesai: {tvName} — {total}";
+            }
+            else
+            {
+                StatusMessage = result.ErrorMessage ?? "Gagal mengakhiri sesi.";
+            }
 
             await LoadDashboardAsync();
         }
@@ -255,6 +291,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             AppLog.Error("End session failed", ex);
             StatusMessage = "Gagal mengakhiri sesi.";
+            await LoadDashboardAsync();
         }
         finally
         {
@@ -353,6 +390,49 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             AppLog.Error("Failed to open add Smart TV dialog", ex);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManageSettings))]
+    private async Task ListPackagesAsync()
+    {
+        if (_ownerWindow is null)
+            return;
+
+        try
+        {
+            var dialog = new PackageListWindow();
+            var viewModel = new PackageListViewModel(_packageService, () => dialog.Close());
+            viewModel.SetOwnerWindow(dialog);
+            dialog.DataContext = viewModel;
+
+            await viewModel.LoadAsync();
+            await dialog.ShowDialog(_ownerWindow);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Failed to open package list dialog", ex);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManageSettings))]
+    private async Task AddPackageAsync()
+    {
+        if (_ownerWindow is null)
+            return;
+
+        try
+        {
+            var dialog = new AddPackageWindow();
+            dialog.DataContext = new AddPackageViewModel(
+                _packageService,
+                () => dialog.Close());
+
+            await dialog.ShowDialog(_ownerWindow);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Failed to open add package dialog", ex);
         }
     }
 

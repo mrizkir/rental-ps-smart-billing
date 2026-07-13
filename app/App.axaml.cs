@@ -67,6 +67,7 @@ public partial class App : Application
                 AppServices.Session,
                 AppServices.Users,
                 AppServices.SmartTvs,
+                AppServices.Packages,
                 AppServices.Billing)
         };
 

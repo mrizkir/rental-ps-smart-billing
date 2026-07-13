@@ -1,6 +1,6 @@
 namespace rental_ps_smart_billing.Models;
 
-public sealed class BillingPackage
+public sealed class BillingPackageListItem
 {
     public int Id { get; init; }
     public required string Name { get; init; }
@@ -11,7 +11,11 @@ public sealed class BillingPackage
 
     public bool IsOpenEnded => BillingModes.IsOpenEnded(BillingMode);
 
-    public string DisplayLabel => IsOpenEnded
-        ? $"{Name} (Free Play) — Rp {Price:N0}/menit"
-        : $"{Name} ({DurationMinutes} menit) — Rp {Price:N0}";
+    public string DurationDisplay => IsOpenEnded ? "Free Play" : $"{DurationMinutes} menit";
+
+    public string PriceDisplay => IsOpenEnded
+        ? $"Rp {Price:N0}/menit"
+        : $"Rp {Price:N0}";
+
+    public string Status => IsActive ? "Aktif" : "Nonaktif";
 }

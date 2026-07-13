@@ -7,6 +7,7 @@ public interface IBillingService
 {
     Task<IReadOnlyList<UnitCardItem>> GetDashboardAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BillingPackage>> GetPackagesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<BillingPackage>> GetFixedPackagesAsync(CancellationToken cancellationToken = default);
     Task<BillingResult> StartSessionAsync(
         int smartTvId,
         int packageId,
@@ -48,6 +49,12 @@ public sealed class BillingService : IBillingService
     public Task<IReadOnlyList<BillingPackage>> GetPackagesAsync(CancellationToken cancellationToken = default) =>
         _packages.GetActiveAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<BillingPackage>> GetFixedPackagesAsync(CancellationToken cancellationToken = default)
+    {
+        var packages = await _packages.GetActiveAsync(cancellationToken);
+        return packages.Where(p => !p.IsOpenEnded).ToList();
+    }
+
     public async Task<BillingResult> StartSessionAsync(
         int smartTvId,
         int packageId,
@@ -69,7 +76,10 @@ public sealed class BillingService : IBillingService
 
         var name = string.IsNullOrWhiteSpace(customerName) ? "Guest" : customerName.Trim();
         var startedAt = DateTime.UtcNow;
-        var endsAt = startedAt.AddMinutes(package.DurationMinutes);
+        DateTime? endsAt = package.IsOpenEnded
+            ? null
+            : startedAt.AddMinutes(package.DurationMinutes);
+        var amount = package.IsOpenEnded ? 0m : package.Price;
 
         await _sessions.CreateAsync(
             smartTvId,
@@ -77,11 +87,11 @@ public sealed class BillingService : IBillingService
             name,
             startedAt,
             endsAt,
-            package.Price,
+            amount,
             startedByUserId,
             cancellationToken);
 
-        AppLog.Info($"Session started: TV={tv.Name}, package={package.Name}, customer={name}");
+        AppLog.Info($"Session started: TV={tv.Name}, package={package.Name}, mode={package.BillingMode}, customer={name}");
 
         string? warning = null;
         var token = tv.Token;
@@ -92,7 +102,7 @@ public sealed class BillingService : IBillingService
         if (!powerOn.Success)
         {
             warning = $"Sesi dibuat, tetapi power-on gagal: {powerOn.Message}";
-            return BillingResult.Succeeded(warning);
+            return BillingResult.Succeeded(warning, amount);
         }
 
         var splash = await _tvApi.ShowSplashAsync(
@@ -109,7 +119,7 @@ public sealed class BillingService : IBillingService
         if (!splash.Success)
             warning = $"Splash gagal: {splash.Message}";
 
-        return BillingResult.Succeeded(warning);
+        return BillingResult.Succeeded(warning, amount);
     }
 
     public async Task<BillingResult> ExtendSessionAsync(
@@ -121,11 +131,17 @@ public sealed class BillingService : IBillingService
         if (session is null || session.Status != "Active")
             return BillingResult.Failed("Sesi aktif tidak ditemukan.");
 
+        if (session.IsOpenEnded || session.EndsAt is null)
+            return BillingResult.Failed("Sesi Free Play tidak bisa ditambah waktu. Akhiri dengan BAYAR.");
+
         var package = await _packages.GetByIdAsync(packageId, cancellationToken);
         if (package is null || !package.IsActive)
             return BillingResult.Failed("Paket tidak valid.");
 
-        var baseTime = session.EndsAt > DateTime.UtcNow ? session.EndsAt : DateTime.UtcNow;
+        if (package.IsOpenEnded)
+            return BillingResult.Failed("Tidak bisa menambah waktu dengan paket Free Play.");
+
+        var baseTime = session.EndsAt.Value > DateTime.UtcNow ? session.EndsAt.Value : DateTime.UtcNow;
         var newEndsAt = baseTime.AddMinutes(package.DurationMinutes);
         var newAmount = (session.Amount ?? 0) + package.Price;
 
@@ -151,7 +167,7 @@ public sealed class BillingService : IBillingService
         }
 
         AppLog.Info($"Session extended: id={sessionId}, +{package.Name}");
-        return BillingResult.Succeeded(warning);
+        return BillingResult.Succeeded(warning, newAmount);
     }
 
     public async Task<BillingResult> EndSessionAsync(
@@ -162,28 +178,46 @@ public sealed class BillingService : IBillingService
         if (session is null || session.Status != "Active")
             return BillingResult.Failed("Sesi aktif tidak ditemukan.");
 
-        var amount = session.Amount ?? session.PackagePrice ?? 0;
-        await _sessions.CompleteAsync(sessionId, DateTime.UtcNow, amount, cancellationToken);
+        var endedAt = DateTime.UtcNow;
+        decimal amount;
+        if (session.IsOpenEnded)
+        {
+            var rate = session.PackagePrice ?? 0;
+            amount = BillingCalculator.CalculateOpenEndedAmount(session.StartedAt, endedAt, rate);
+            var minutes = BillingCalculator.BillableMinutes(session.StartedAt, endedAt);
+            AppLog.Info($"Open-ended session billed: id={sessionId}, minutes={minutes}, amount={amount}");
+        }
+        else
+        {
+            amount = session.Amount ?? session.PackagePrice ?? 0;
+        }
+
+        // Persist completion first so dashboard/timer can stop before TV power-off.
+        await _sessions.CompleteAsync(sessionId, endedAt, amount, cancellationToken);
+        AppLog.Info($"Session ended: id={sessionId}, amount={amount}");
 
         string? warning = null;
         var tv = await _smartTvs.GetByIdAsync(session.SmartTvId, cancellationToken);
         if (tv is not null)
         {
-            var powerOff = await _tvApi.PowerOffAsync(
-                tv.IpAddress, tv.MacAddress, tv.WsPort, tv.Token, cancellationToken);
-            await PersistTokenAsync(tv.Id, tv.Token, powerOff, cancellationToken);
-            if (!powerOff.Success)
-                warning = $"Sesi selesai, tetapi power-off gagal: {powerOff.Message}";
+            try
+            {
+                var powerOff = await _tvApi.PowerOffAsync(
+                    tv.IpAddress, tv.MacAddress, tv.WsPort, tv.Token, cancellationToken);
+                await PersistTokenAsync(tv.Id, tv.Token, powerOff, cancellationToken);
+                if (!powerOff.Success)
+                    warning = $"Sesi selesai, tetapi power-off gagal: {powerOff.Message}";
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"Power-off failed after session end id={sessionId}", ex);
+                warning = "Sesi selesai, tetapi power-off gagal.";
+            }
         }
 
-        AppLog.Info($"Session ended: id={sessionId}, amount={amount}");
-        return BillingResult.Succeeded(warning);
+        return BillingResult.Succeeded(warning, amount);
     }
 
-    /// <summary>
-    /// Samsung often rotates the pairing token on each WebSocket connect.
-    /// Persist the latest token so the next call reuses it.
-    /// </summary>
     private async Task<string?> PersistTokenAsync(
         int smartTvId,
         string? currentToken,

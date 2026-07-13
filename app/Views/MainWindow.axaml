@@ -35,6 +35,13 @@
                 <MenuItem Header="_Tambah Smart TV"
                           Command="{Binding AddSmartTvCommand}" />
             </MenuItem>
+            <MenuItem Header="_Paket"
+                      IsVisible="{Binding CanManageSettings}">
+                <MenuItem Header="_Daftar Paket"
+                          Command="{Binding ListPackagesCommand}" />
+                <MenuItem Header="_Tambah Paket"
+                          Command="{Binding AddPackageCommand}" />
+            </MenuItem>
             <MenuItem Header="_Billing">
                 <MenuItem Header="_Refresh Dashboard"
                           Command="{Binding RefreshDashboardCommand}" />
@@ -152,7 +159,7 @@
                                     </Border>
 
                                     <Grid Grid.Row="4" ColumnDefinitions="*,*" ColumnSpacing="8"
-                                          IsVisible="{Binding IsPlaying}">
+                                          IsVisible="{Binding ShowFixedPlayingActions}">
                                         <Button Grid.Column="0"
                                                 Content="TAMBAH WAKTU"
                                                 Command="{Binding ExtendCommand}"
@@ -168,6 +175,16 @@
                                                 Background="#C62828"
                                                 Foreground="White" />
                                     </Grid>
+
+                                    <Button Grid.Row="4"
+                                            Content="BAYAR"
+                                            Command="{Binding PayCommand}"
+                                            Height="34"
+                                            FontSize="11"
+                                            FontWeight="SemiBold"
+                                            Background="#C62828"
+                                            Foreground="White"
+                                            IsVisible="{Binding ShowOpenEndedPay}" />
 
                                     <Button Grid.Row="4"
                                             Content="START"

@@ -5,6 +5,7 @@ public sealed class BillingResult
     public bool Success { get; init; }
     public string? ErrorMessage { get; init; }
     public string? WarningMessage { get; init; }
+    public decimal? Amount { get; init; }
 
     public static BillingResult Failed(string message) => new()
     {
@@ -12,9 +13,10 @@ public sealed class BillingResult
         ErrorMessage = message
     };
 
-    public static BillingResult Succeeded(string? warning = null) => new()
+    public static BillingResult Succeeded(string? warning = null, decimal? amount = null) => new()
     {
         Success = true,
-        WarningMessage = warning
+        WarningMessage = warning,
+        Amount = amount
     };
 }

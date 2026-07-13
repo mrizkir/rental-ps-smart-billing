@@ -15,8 +15,11 @@ public sealed class UnitCardItem
     public DateTime? StartedAt { get; init; }
     public DateTime? EndsAt { get; init; }
     public decimal Amount { get; init; }
+    public decimal PackagePrice { get; init; }
+    public string BillingMode { get; init; } = BillingModes.Fixed;
 
     public bool IsPlaying => SessionId is not null;
+    public bool IsOpenEnded => BillingModes.IsOpenEnded(BillingMode);
 
     public string StatusLabel => IsPlaying ? "PLAYING" : "AVAILABLE";
 }

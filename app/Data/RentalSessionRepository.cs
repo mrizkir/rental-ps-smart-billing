@@ -14,7 +14,7 @@ public interface IRentalSessionRepository
         int packageId,
         string? customerName,
         DateTime startedAt,
-        DateTime endsAt,
+        DateTime? endsAt,
         decimal amount,
         int? startedByUserId,
         CancellationToken cancellationToken = default);
@@ -58,7 +58,9 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
                 p.Name,
                 s.StartedAt,
                 s.EndsAt,
-                ISNULL(s.Amount, 0)
+                ISNULL(s.Amount, 0),
+                ISNULL(p.Price, 0),
+                ISNULL(p.BillingMode, 'Fixed')
             FROM SmartTvs t
             LEFT JOIN RentalSessions s
                 ON s.SmartTvId = t.Id AND s.Status = 'Active'
@@ -85,7 +87,9 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
                 PackageName = reader.IsDBNull(8) ? null : reader.GetString(8),
                 StartedAt = reader.IsDBNull(9) ? null : reader.GetDateTime(9),
                 EndsAt = reader.IsDBNull(10) ? null : reader.GetDateTime(10),
-                Amount = reader.GetDecimal(11)
+                Amount = reader.GetDecimal(11),
+                PackagePrice = reader.GetDecimal(12),
+                BillingMode = reader.GetString(13)
             });
         }
 
@@ -102,7 +106,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
             SELECT
                 s.Id, s.SmartTvId, s.PackageId, s.CustomerName,
                 s.StartedAt, s.EndsAt, s.EndedAt, s.Status, s.Amount, s.StartedByUserId,
-                p.Name, p.Price
+                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed')
             FROM RentalSessions s
             LEFT JOIN BillingPackages p ON p.Id = s.PackageId
             WHERE s.SmartTvId = @SmartTvId AND s.Status = 'Active'
@@ -123,7 +127,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
             SELECT
                 s.Id, s.SmartTvId, s.PackageId, s.CustomerName,
                 s.StartedAt, s.EndsAt, s.EndedAt, s.Status, s.Amount, s.StartedByUserId,
-                p.Name, p.Price
+                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed')
             FROM RentalSessions s
             LEFT JOIN BillingPackages p ON p.Id = s.PackageId
             WHERE s.Id = @Id
@@ -144,10 +148,12 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
             SELECT
                 s.Id, s.SmartTvId, s.PackageId, s.CustomerName,
                 s.StartedAt, s.EndsAt, s.EndedAt, s.Status, s.Amount, s.StartedByUserId,
-                p.Name, p.Price
+                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed')
             FROM RentalSessions s
             LEFT JOIN BillingPackages p ON p.Id = s.PackageId
-            WHERE s.Status = 'Active' AND s.EndsAt <= SYSUTCDATETIME()
+            WHERE s.Status = 'Active'
+              AND s.EndsAt IS NOT NULL
+              AND s.EndsAt <= SYSUTCDATETIME()
             """,
             connection);
 
@@ -164,7 +170,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
         int packageId,
         string? customerName,
         DateTime startedAt,
-        DateTime endsAt,
+        DateTime? endsAt,
         decimal amount,
         int? startedByUserId,
         CancellationToken cancellationToken = default)
@@ -185,7 +191,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
         command.Parameters.AddWithValue("@PackageId", packageId);
         command.Parameters.AddWithValue("@CustomerName", (object?)customerName ?? DBNull.Value);
         command.Parameters.AddWithValue("@StartedAt", startedAt);
-        command.Parameters.AddWithValue("@EndsAt", endsAt);
+        command.Parameters.AddWithValue("@EndsAt", (object?)endsAt ?? DBNull.Value);
         command.Parameters.AddWithValue("@Amount", amount);
         command.Parameters.AddWithValue("@StartedByUserId", (object?)startedByUserId ?? DBNull.Value);
 
@@ -207,7 +213,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
             SET EndsAt = @EndsAt,
                 Amount = @Amount,
                 UpdatedAt = SYSUTCDATETIME()
-            WHERE Id = @Id AND Status = 'Active'
+            WHERE Id = @Id AND Status = 'Active' AND EndsAt IS NOT NULL
             """,
             connection);
         command.Parameters.AddWithValue("@Id", sessionId);
@@ -216,7 +222,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
 
         var rows = await command.ExecuteNonQueryAsync(cancellationToken);
         if (rows == 0)
-            throw new InvalidOperationException("Sesi aktif tidak ditemukan.");
+            throw new InvalidOperationException("Sesi aktif tidak ditemukan atau Free Play tidak bisa ditambah waktu.");
     }
 
     public async Task CompleteAsync(
@@ -232,6 +238,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
             """
             UPDATE RentalSessions
             SET EndedAt = @EndedAt,
+                EndsAt = ISNULL(EndsAt, @EndedAt),
                 Status = 'Completed',
                 Amount = @Amount,
                 UpdatedAt = SYSUTCDATETIME()
@@ -262,12 +269,15 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
         PackageId = reader.IsDBNull(2) ? null : reader.GetInt32(2),
         CustomerName = reader.IsDBNull(3) ? null : reader.GetString(3),
         StartedAt = reader.GetDateTime(4),
-        EndsAt = reader.GetDateTime(5),
+        EndsAt = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
         EndedAt = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
         Status = reader.GetString(7),
         Amount = reader.IsDBNull(8) ? null : reader.GetDecimal(8),
         StartedByUserId = reader.IsDBNull(9) ? null : reader.GetInt32(9),
         PackageName = reader.IsDBNull(10) ? null : reader.GetString(10),
-        PackagePrice = reader.IsDBNull(11) ? null : reader.GetDecimal(11)
+        PackagePrice = reader.IsDBNull(11) ? null : reader.GetDecimal(11),
+        BillingMode = reader.FieldCount > 12 && !reader.IsDBNull(12)
+            ? reader.GetString(12)
+            : BillingModes.Fixed
     };
 }

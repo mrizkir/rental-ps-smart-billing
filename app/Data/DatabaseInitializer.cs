@@ -52,8 +52,8 @@ public sealed class DatabaseInitializer
         await using var seedCommand = new SqlCommand(
             """
             INSERT INTO BillingPackages (Name, DurationMinutes, Price) VALUES
-            (N'1 Jam', 60, 15000),
-            (N'2 Jam', 120, 25000);
+            (N'Paket 60 Menit', 60, 15000),
+            (N'Paket 120 Menit', 120, 25000);
             """,
             connection);
         await seedCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -237,9 +237,17 @@ public sealed class DatabaseInitializer
                 Name            NVARCHAR(50) NOT NULL,
                 DurationMinutes INT NOT NULL,
                 Price           DECIMAL(18,2) NOT NULL,
+                BillingMode     NVARCHAR(20) NOT NULL DEFAULT 'Fixed',
                 IsActive        BIT NOT NULL DEFAULT 1,
                 CreatedAt       DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
             );
+        END
+
+        IF COL_LENGTH('dbo.BillingPackages', 'BillingMode') IS NULL
+        BEGIN
+            ALTER TABLE BillingPackages
+            ADD BillingMode NVARCHAR(20) NOT NULL
+                CONSTRAINT DF_BillingPackages_BillingMode DEFAULT 'Fixed';
         END
 
         IF OBJECT_ID('dbo.RentalSessions', 'U') IS NULL
@@ -250,7 +258,7 @@ public sealed class DatabaseInitializer
                 PackageId       INT NULL REFERENCES BillingPackages(Id),
                 CustomerName    NVARCHAR(100) NULL,
                 StartedAt       DATETIME2 NOT NULL,
-                EndsAt          DATETIME2 NOT NULL,
+                EndsAt          DATETIME2 NULL,
                 EndedAt         DATETIME2 NULL,
                 Status          NVARCHAR(20) NOT NULL,
                 Amount          DECIMAL(18,2) NULL,
@@ -258,6 +266,17 @@ public sealed class DatabaseInitializer
                 CreatedAt       DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
                 UpdatedAt       DATETIME2 NULL
             );
+        END
+
+        -- Free Play (open-ended) menyimpan EndsAt = NULL
+        IF EXISTS (
+            SELECT 1
+            FROM sys.columns
+            WHERE object_id = OBJECT_ID('dbo.RentalSessions')
+              AND name = 'EndsAt'
+              AND is_nullable = 0)
+        BEGIN
+            ALTER TABLE RentalSessions ALTER COLUMN EndsAt DATETIME2 NULL;
         END
 
         IF NOT EXISTS (

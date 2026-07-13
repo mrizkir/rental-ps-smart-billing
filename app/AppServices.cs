@@ -10,6 +10,7 @@ public static class AppServices
     public static IAuthService Auth { get; private set; } = null!;
     public static IUserService Users { get; private set; } = null!;
     public static ISmartTvService SmartTvs { get; private set; } = null!;
+    public static IBillingPackageService Packages { get; private set; } = null!;
     public static IBillingService Billing { get; private set; } = null!;
     public static bool IsInitialized { get; private set; }
 
@@ -72,6 +73,7 @@ public static class AppServices
         Auth = new AuthService(userRepository);
         Users = new UserService(userRepository);
         SmartTvs = new SmartTvService(smartTvRepository, tvApiClient);
+        Packages = new BillingPackageService(packageRepository);
         Billing = new BillingService(sessionRepository, packageRepository, smartTvRepository, tvApiClient);
         IsInitialized = true;
 
