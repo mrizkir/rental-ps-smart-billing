@@ -159,6 +159,8 @@ cd app
 dotnet run -- --verbose
 ```
 
+Di Windows (`WinExe`), log muncul di terminal yang sama bila dijalankan dengan `--verbose` atau `--test-db`.
+
 Saat pertama kali jalan, aplikasi akan:
 1. Membuat database `rental_ps` jika belum ada
 2. Membuat tabel (Users, Roles, SmartTvs, dll.)
@@ -180,10 +182,40 @@ Di [`app/appsettings.json`](app/appsettings.json):
 ```json
 "TvService": {
   "BaseUrl": "http://127.0.0.1:5001"
+},
+"Billing": {
+  "FreePlayGraceMinutes": 5,
+  "SleepTimerWarnMinutesBeforeEnd": 5,
+  "SleepTimerMinutes": 30
 }
 ```
 
 `BaseUrl` harus mengarah ke Python TV service (lihat bagian berikutnya). Token pairing per TV disimpan di kolom `SmartTvs.Token` di database (bukan file).
+
+`FreePlayGraceMinutes` = menit awal Free Play yang **tidak ditagih** (default `5`). Override bisa di `appsettings.local.json` atau env `RENTAL_PS_Billing__FreePlayGraceMinutes`.
+
+`SleepTimerWarnMinutesBeforeEnd` = menit sebelum sesi paket tetap berakhir, app otomatis set Sleep Timer di TV (default `5`). Set `0` untuk menonaktifkan auto. Operator juga bisa menekan tombol **SLEEP TIMER** di kartu unit.
+
+`SleepTimerMinutes` = fallback durasi Sleep Timer jika Smart TV belum punya model (default `30`).
+
+### Model TV (multi-rental)
+
+Menu **Smart TV → Daftar Model TV** mengelola profil per model (contoh `43U8000F`):
+- mode Sleep Timer (`menu` / `cycle`)
+- durasi menit
+- urutan tombol setelah `KEY_SLEEP` (`KEY_DOWN,KEY_ENTER`, dll.)
+
+Setiap Smart TV memilih **Model TV**. Saat Sleep Timer dikirim, profil model itulah yang dipakai — cocok untuk toko dengan model TV berbeda. Seed awal: `43U8000F`.
+
+### Laporan pendapatan
+
+Menu **Billing → Laporan Pendapatan** (izin `billing.view`):
+- filter tanggal (hari ini / bulan ini / rentang custom)
+- ringkasan jumlah transaksi selesai + total pendapatan
+- daftar detail per sesi (waktu, unit TV, customer, paket, jumlah)
+- **Export Excel** (`.xlsx`) via dialog simpan file
+
+Data diambil dari sesi berstatus **Completed** berdasarkan waktu selesai (`EndedAt`) di zona waktu lokal kasir.
 
 ---
 
@@ -288,6 +320,7 @@ Lalu login sebagai `admin` / `Admin123!` → menu **Smart TV** untuk kelola dan 
 | Masalah | Solusi |
 |---------|--------|
 | `Login failed for user 'sa'` | Password di `appsettings.local.json` harus sama dengan yang dipakai di DBeaver. Uji: `dotnet run -- --test-db` |
+| Log `--verbose` / `--test-db` tidak muncul (Windows) | Pastikan flag ada di perintah. App `WinExe` hanya attach console untuk `--verbose` / `--test-db`. |
 | `Python TV service tidak berjalan` | Pastikan `python tv_service.py` sudah jalan di terminal terpisah |
 | Test koneksi TV gagal | Cek IP/MAC TV, pastikan TV menyala & di LAN yang sama, lakukan pairing token jika belum |
 | Menu Smart TV tidak muncul | Login sebagai superadmin (`admin`), bukan operator |

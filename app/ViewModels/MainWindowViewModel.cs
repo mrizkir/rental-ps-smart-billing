@@ -14,23 +14,28 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ISessionService _session;
     private readonly IUserService _userService;
     private readonly ISmartTvService _smartTvService;
+    private readonly ITvModelService _tvModelService;
     private readonly IBillingPackageService _packageService;
     private readonly IBillingService _billingService;
     private readonly DispatcherTimer _timer;
+    private readonly HashSet<int> _sleepWarnedSessionIds = [];
     private Window? _ownerWindow;
     private bool _isRefreshing;
     private bool _disposed;
+    private bool _isSendingSleepWarn;
 
     public MainWindowViewModel(
         ISessionService session,
         IUserService userService,
         ISmartTvService smartTvService,
+        ITvModelService tvModelService,
         IBillingPackageService packageService,
         IBillingService billingService)
     {
         _session = session;
         _userService = userService;
         _smartTvService = smartTvService;
+        _tvModelService = tvModelService;
         _packageService = packageService;
         _billingService = billingService;
 
@@ -38,7 +43,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _timer.Tick += OnTimerTick;
     }
 
-    public MainWindowViewModel() : this(new SessionService(), null!, null!, null!, null!)
+    public MainWindowViewModel() : this(new SessionService(), null!, null!, null!, null!, null!)
     {
     }
 
@@ -58,6 +63,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public bool CanManageSettings => _session.HasPermission("settings.manage");
     public bool CanStartSession => _session.HasPermission("billing.session.start");
     public bool CanEndSession => _session.HasPermission("billing.session.end");
+    public bool CanViewBilling => _session.HasPermission("billing.view");
     public bool IsSuperAdmin => _session.IsInRole("superadmin");
 
     [ObservableProperty]
@@ -91,7 +97,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     CanEndSession,
                     StartUnitAsync,
                     ExtendUnitAsync,
-                    PayUnitAsync));
+                    PayUnitAsync,
+                    SleepTimerUnitAsync));
             }
 
             StatusMessage = Units.Count == 0
@@ -120,6 +127,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (_isRefreshing || _billingService is null)
             return;
 
+        await TryAutoSleepWarnAsync(now);
+
         var expired = Units.Where(u => u.IsExpired(now) && u.SessionId is not null).ToList();
         if (expired.Count == 0)
             return;
@@ -128,7 +137,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             foreach (var unit in expired)
+            {
+                if (unit.SessionId is int sessionId)
+                    _sleepWarnedSessionIds.Remove(sessionId);
                 unit.MarkStopped();
+            }
 
             await _billingService.AutoEndExpiredAsync();
             await LoadDashboardAsync();
@@ -136,6 +149,57 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         finally
         {
             _isRefreshing = false;
+        }
+    }
+
+    private async Task TryAutoSleepWarnAsync(DateTime utcNow)
+    {
+        var warnMinutes = BillingCalculator.SleepTimerWarnMinutesBeforeEnd;
+        if (warnMinutes <= 0 || _isSendingSleepWarn || !CanEndSession)
+            return;
+
+        // Reset warn flag if session diperpanjang melewati jendela peringatan.
+        foreach (var unit in Units)
+        {
+            if (unit.SessionId is not int sessionId || unit.EndsAt is null)
+                continue;
+
+            if (unit.EndsAt.Value - utcNow > TimeSpan.FromMinutes(warnMinutes))
+                _sleepWarnedSessionIds.Remove(sessionId);
+        }
+
+        var toWarn = Units
+            .Where(u => u.SessionId is not null
+                        && u.NeedsSleepTimerWarn(utcNow, warnMinutes)
+                        && !_sleepWarnedSessionIds.Contains(u.SessionId.Value))
+            .ToList();
+
+        if (toWarn.Count == 0)
+            return;
+
+        _isSendingSleepWarn = true;
+        try
+        {
+            foreach (var unit in toWarn)
+            {
+                var sessionId = unit.SessionId!.Value;
+                _sleepWarnedSessionIds.Add(sessionId);
+                try
+                {
+                    var result = await _billingService.ShowSleepTimerAsync(unit.SmartTvId);
+                    StatusMessage = result.Success
+                        ? (result.WarningMessage ?? $"Sleep Timer otomatis: {unit.TvName}")
+                        : (result.ErrorMessage ?? $"Sleep Timer gagal: {unit.TvName}");
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Error($"Auto sleep timer failed for TV {unit.TvName}", ex);
+                }
+            }
+        }
+        finally
+        {
+            _isSendingSleepWarn = false;
         }
     }
 
@@ -206,31 +270,39 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var packages = await _billingService.GetFixedPackagesAsync();
-            if (packages.Count == 0)
-            {
-                StatusMessage = "Tidak ada paket tetap untuk menambah waktu.";
-                return;
-            }
 
-            var dialog = new StartSessionWindow();
-            var vm = new StartSessionViewModel(
+            var dialog = new ExtendSessionWindow();
+            var vm = new ExtendSessionViewModel(
                 unit.TvName,
                 packages,
-                "Tambah Waktu",
-                _ => dialog.Close())
-            {
-                ShowCustomerField = false
-            };
+                _ => dialog.Close());
             dialog.DataContext = vm;
             await dialog.ShowDialog(_ownerWindow);
 
-            if (!vm.Confirmed || vm.ResultPackage is null)
+            if (!vm.Confirmed)
                 return;
 
             IsBusy = true;
-            var result = await _billingService.ExtendSessionAsync(unit.SessionId.Value, vm.ResultPackage.Id);
+            BillingResult result;
+            if (vm.IsCustomResult)
+            {
+                result = await _billingService.ExtendSessionByCustomAsync(
+                    unit.SessionId.Value,
+                    vm.ResultMinutes,
+                    vm.ResultPrice);
+            }
+            else
+            {
+                if (vm.ResultPackage is null)
+                    return;
+
+                result = await _billingService.ExtendSessionAsync(
+                    unit.SessionId.Value,
+                    vm.ResultPackage.Id);
+            }
+
             StatusMessage = result.Success
-                ? (result.WarningMessage ?? $"Waktu ditambah: {unit.TvName}")
+                ? (result.WarningMessage ?? $"Waktu ditambah: {unit.TvName} (+{vm.ResultMinutes} menit)")
                 : (result.ErrorMessage ?? "Gagal tambah waktu.");
 
             await LoadDashboardAsync();
@@ -239,6 +311,33 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             AppLog.Error("Extend session failed", ex);
             StatusMessage = "Gagal menambah waktu.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task SleepTimerUnitAsync(UnitCardViewModel unit)
+    {
+        if (!CanEndSession || !unit.IsPlaying)
+            return;
+
+        try
+        {
+            IsBusy = true;
+            var result = await _billingService.ShowSleepTimerAsync(unit.SmartTvId);
+            if (unit.SessionId is int sessionId)
+                _sleepWarnedSessionIds.Add(sessionId);
+
+            StatusMessage = result.Success
+                ? (result.WarningMessage ?? $"Sleep Timer dikirim: {unit.TvName}")
+                : (result.ErrorMessage ?? "Gagal mengirim Sleep Timer.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Manual sleep timer failed", ex);
+            StatusMessage = "Gagal mengirim Sleep Timer.";
         }
         finally
         {
@@ -357,7 +456,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var dialog = new SmartTvListWindow();
-            var viewModel = new SmartTvListViewModel(_smartTvService, () => dialog.Close());
+            var viewModel = new SmartTvListViewModel(
+                _smartTvService,
+                _tvModelService,
+                () => dialog.Close());
             viewModel.SetOwnerWindow(dialog);
             dialog.DataContext = viewModel;
 
@@ -382,6 +484,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             var dialog = new AddSmartTvWindow();
             dialog.DataContext = new AddSmartTvViewModel(
                 _smartTvService,
+                _tvModelService,
                 () => dialog.Close());
 
             await dialog.ShowDialog(_ownerWindow);
@@ -390,6 +493,45 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             AppLog.Error("Failed to open add Smart TV dialog", ex);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManageSettings))]
+    private async Task ListTvModelsAsync()
+    {
+        if (_ownerWindow is null)
+            return;
+
+        try
+        {
+            var dialog = new TvModelListWindow();
+            var viewModel = new TvModelListViewModel(_tvModelService, () => dialog.Close());
+            viewModel.SetOwnerWindow(dialog);
+            dialog.DataContext = viewModel;
+            await viewModel.LoadAsync();
+            await dialog.ShowDialog(_ownerWindow);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Failed to open TV model list dialog", ex);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanManageSettings))]
+    private async Task AddTvModelAsync()
+    {
+        if (_ownerWindow is null)
+            return;
+
+        try
+        {
+            var dialog = new AddTvModelWindow();
+            dialog.DataContext = new AddTvModelViewModel(_tvModelService, () => dialog.Close());
+            await dialog.ShowDialog(_ownerWindow);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Failed to open add TV model dialog", ex);
         }
     }
 
@@ -433,6 +575,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             AppLog.Error("Failed to open add package dialog", ex);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanViewBilling))]
+    private async Task OpenRevenueReportAsync()
+    {
+        if (_ownerWindow is null)
+            return;
+
+        try
+        {
+            var dialog = new RevenueReportWindow();
+            var viewModel = new RevenueReportViewModel(_billingService, () => dialog.Close());
+            viewModel.SetOwnerWindow(dialog);
+            dialog.DataContext = viewModel;
+            await viewModel.LoadTodayAsync();
+            await dialog.ShowDialog(_ownerWindow);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Failed to open revenue report dialog", ex);
         }
     }
 

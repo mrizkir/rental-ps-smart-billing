@@ -35,7 +35,34 @@ public sealed class DatabaseInitializer
         AppLog.Step("Checking seed data...");
         await SeedAsync(connection, cancellationToken);
         await SeedBillingPackagesAsync(connection, cancellationToken);
+        await SeedTvModelsAsync(connection, cancellationToken);
         AppLog.Step("Seed check completed");
+    }
+
+    private static async Task SeedTvModelsAsync(SqlConnection connection, CancellationToken cancellationToken)
+    {
+        await using var existsCommand = new SqlCommand(
+            "SELECT COUNT(*) FROM TvModels WHERE Code = @Code",
+            connection);
+        existsCommand.Parameters.AddWithValue("@Code", "43U8000F");
+        var count = (int)(await existsCommand.ExecuteScalarAsync(cancellationToken) ?? 0);
+        if (count > 0)
+        {
+            AppLog.Step("TV model seed skipped, 43U8000F already exists");
+            return;
+        }
+
+        AppLog.Info("Seeding default TV model 43U8000F...");
+        await using var seedCommand = new SqlCommand(
+            """
+            INSERT INTO TvModels
+                (Code, Name, Brand, SleepTimerMode, SleepTimerMinutes, SleepTimerKeyDelaySeconds, SleepTimerConfirmKeys)
+            VALUES
+                (N'43U8000F', N'Samsung 43U8000F', N'Samsung', N'menu', 30, 1.00, N'KEY_DOWN,KEY_ENTER');
+            """,
+            connection);
+        await seedCommand.ExecuteNonQueryAsync(cancellationToken);
+        AppLog.Info("TV model seed completed");
     }
 
     private static async Task SeedBillingPackagesAsync(SqlConnection connection, CancellationToken cancellationToken)
@@ -228,6 +255,38 @@ public sealed class DatabaseInitializer
         BEGIN
             CREATE UNIQUE INDEX UX_SmartTvs_MacAddress
                 ON SmartTvs (MacAddress) WHERE IsActive = 1;
+        END
+
+        IF OBJECT_ID('dbo.TvModels', 'U') IS NULL
+        BEGIN
+            CREATE TABLE TvModels (
+                Id                         INT IDENTITY(1,1) PRIMARY KEY,
+                Code                       NVARCHAR(50)  NOT NULL,
+                Name                       NVARCHAR(100) NOT NULL,
+                Brand                      NVARCHAR(50)  NOT NULL DEFAULT 'Samsung',
+                SleepTimerMode             NVARCHAR(20)  NOT NULL DEFAULT 'menu',
+                SleepTimerMinutes          INT NOT NULL DEFAULT 30,
+                SleepTimerKeyDelaySeconds  DECIMAL(4,2) NOT NULL DEFAULT 1.00,
+                SleepTimerConfirmKeys      NVARCHAR(200) NOT NULL DEFAULT 'KEY_DOWN,KEY_ENTER',
+                IsActive                   BIT NOT NULL DEFAULT 1,
+                CreatedAt                  DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+                UpdatedAt                  DATETIME2 NULL
+            );
+        END
+
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.indexes
+            WHERE name = 'UX_TvModels_Code' AND object_id = OBJECT_ID('dbo.TvModels'))
+        BEGIN
+            CREATE UNIQUE INDEX UX_TvModels_Code
+                ON TvModels (Code) WHERE IsActive = 1;
+        END
+
+        IF COL_LENGTH('dbo.SmartTvs', 'ModelId') IS NULL
+        BEGIN
+            ALTER TABLE SmartTvs
+            ADD ModelId INT NULL
+                CONSTRAINT FK_SmartTvs_TvModels REFERENCES TvModels(Id);
         END
 
         IF OBJECT_ID('dbo.BillingPackages', 'U') IS NULL

@@ -5,6 +5,7 @@ public sealed class SmartTvListItem
     public int Id { get; init; }
     public required string Name { get; init; }
     public required string Brand { get; init; }
+    public string? ModelCode { get; init; }
     public required string IpAddress { get; init; }
     public required string MacAddress { get; init; }
     public int WsPort { get; init; }
@@ -13,6 +14,7 @@ public sealed class SmartTvListItem
     public DateTime? LastTestAt { get; init; }
 
     public string Status => IsActive ? "Aktif" : "Nonaktif";
+    public string ModelDisplay => string.IsNullOrWhiteSpace(ModelCode) ? "-" : ModelCode;
 
     public string LastTestDisplay => LastTestStatus switch
     {

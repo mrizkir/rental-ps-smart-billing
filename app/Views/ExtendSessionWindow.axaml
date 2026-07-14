@@ -1,0 +1,86 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:rental_ps_smart_billing.ViewModels"
+        xmlns:models="using:rental_ps_smart_billing.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="440" d:DesignHeight="460"
+        x:Class="rental_ps_smart_billing.Views.ExtendSessionWindow"
+        x:DataType="vm:ExtendSessionViewModel"
+        Title="Tambah Waktu"
+        Width="440" Height="460"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#ECEFF1">
+
+    <Border Margin="16" Padding="20" Background="White" CornerRadius="10">
+        <StackPanel Spacing="12">
+            <TextBlock Text="Tambah Waktu"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Foreground="#1A237E" />
+
+            <TextBlock Text="{Binding TvName, StringFormat=Unit: {0}}"
+                       Foreground="#546E7A" />
+
+            <StackPanel Spacing="8">
+                <RadioButton GroupName="ExtendMode"
+                             Content="Pilih paket"
+                             IsChecked="{Binding UsePackage, Mode=OneWay}"
+                             IsEnabled="{Binding HasPackages}"
+                             Command="{Binding SelectPackageModeCommand}" />
+                <RadioButton GroupName="ExtendMode"
+                             Content="Custom menit"
+                             IsChecked="{Binding UseCustomMinutes, Mode=OneWay}"
+                             Command="{Binding SelectCustomModeCommand}" />
+            </StackPanel>
+
+            <StackPanel Spacing="6" IsVisible="{Binding UsePackage}">
+                <TextBlock Text="Paket" Foreground="#37474F" FontWeight="Medium" />
+                <ComboBox ItemsSource="{Binding Packages}"
+                          SelectedItem="{Binding SelectedPackage}"
+                          HorizontalAlignment="Stretch"
+                          IsEnabled="{Binding HasPackages}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:BillingPackage">
+                            <TextBlock Text="{Binding DisplayLabel}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Spacing="10" IsVisible="{Binding UseCustomMinutes}">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Tambahan (menit)" Foreground="#37474F" FontWeight="Medium" />
+                    <TextBox Text="{Binding MinutesText}"
+                             PlaceholderText="contoh: 5 atau 10" />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Harga tambahan (Rp)" Foreground="#37474F" FontWeight="Medium" />
+                    <TextBox Text="{Binding PriceText}"
+                             PlaceholderText="contoh: 2000" />
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="#C62828"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+                <Button Grid.Column="0"
+                        Content="Batal"
+                        Command="{Binding CancelCommand}"
+                        Height="36" />
+                <Button Grid.Column="1"
+                        Content="OK"
+                        Command="{Binding ConfirmCommand}"
+                        Height="36"
+                        Background="#1565C0"
+                        Foreground="White"
+                        FontWeight="SemiBold" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

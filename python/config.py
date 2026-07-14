@@ -19,3 +19,19 @@ TOKENS_DIR = os.path.join(BASE_DIR, "tokens")
 WOL_WAIT_SECONDS = 30
 WOL_POLL_INTERVAL = 2
 WOL_PACKET_COUNT = 3
+
+# Sleep Timer: KEY_SLEEP hanya membuka form; lanjut navigasi untuk set durasi.
+# Mode:
+#   menu  → KEY_SLEEP lalu SLEEP_TIMER_CONFIRM_KEYS (default: Down + Enter = 30 menit)
+#   cycle → tekan KEY_SLEEP berulang (Off→30→60→…); press count dihitung otomatis
+SLEEP_TIMER_MODE = os.environ.get("SLEEP_TIMER_MODE", "menu").strip().lower()
+SLEEP_TIMER_MINUTES = int(os.environ.get("SLEEP_TIMER_MINUTES", "30"))
+SLEEP_TIMER_KEY_DELAY = float(os.environ.get("SLEEP_TIMER_KEY_DELAY", "1.0"))
+# Dipakai mode menu; sesuaikan per model TV jika urutan berbeda
+SLEEP_TIMER_CONFIRM_KEYS = [
+    key.strip()
+    for key in os.environ.get("SLEEP_TIMER_CONFIRM_KEYS", "KEY_DOWN,KEY_ENTER").split(",")
+    if key.strip()
+]
+# Urutan opsi di mode cycle (0/Off diabaikan; tekan pertama = opsi pertama)
+SLEEP_TIMER_CYCLE_OPTIONS = [30, 60, 90, 120, 150, 180]

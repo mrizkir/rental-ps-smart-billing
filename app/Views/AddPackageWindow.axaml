@@ -58,7 +58,7 @@
                          IsEnabled="{Binding !IsBusy}" />
             </StackPanel>
 
-            <TextBlock Text="Free Play: tagihan dihitung per menit aktual saat BAYAR (pembulatan standar)."
+            <TextBlock Text="Free Play: tagihan per menit saat BAYAR. Menit awal gratis diatur di appsettings (Billing:FreePlayGraceMinutes, default 5)."
                        Foreground="#546E7A"
                        TextWrapping="Wrap"
                        FontSize="12"

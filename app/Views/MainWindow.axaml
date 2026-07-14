@@ -34,6 +34,10 @@
                           Command="{Binding ListSmartTvsCommand}" />
                 <MenuItem Header="_Tambah Smart TV"
                           Command="{Binding AddSmartTvCommand}" />
+                <MenuItem Header="_Daftar Model TV"
+                          Command="{Binding ListTvModelsCommand}" />
+                <MenuItem Header="_Tambah Model TV"
+                          Command="{Binding AddTvModelCommand}" />
             </MenuItem>
             <MenuItem Header="_Paket"
                       IsVisible="{Binding CanManageSettings}">
@@ -45,6 +49,9 @@
             <MenuItem Header="_Billing">
                 <MenuItem Header="_Refresh Dashboard"
                           Command="{Binding RefreshDashboardCommand}" />
+                <MenuItem Header="_Laporan Pendapatan"
+                          Command="{Binding OpenRevenueReportCommand}"
+                          IsVisible="{Binding CanViewBilling}" />
             </MenuItem>
         </Menu>
 
@@ -90,7 +97,7 @@
                                     BorderThickness="1"
                                     CornerRadius="10"
                                     Width="260"
-                                    Height="240">
+                                    Height="290">
                                 <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
                                     <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                                         <TextBlock Grid.Column="0"
@@ -145,6 +152,9 @@
                                         <TextBlock Text="{Binding PackageDisplay, StringFormat=Paket: {0}}"
                                                    Foreground="#607D8B"
                                                    FontSize="12" />
+                                        <TextBlock Text="{Binding StartedAtDisplay, StringFormat=Jam Mulai: {0}}"
+                                                   Foreground="#607D8B"
+                                                   FontSize="12" />
                                     </StackPanel>
 
                                     <Border Grid.Row="3"
@@ -158,42 +168,60 @@
                                                    HorizontalAlignment="Center" />
                                     </Border>
 
-                                    <Grid Grid.Row="4" ColumnDefinitions="*,*" ColumnSpacing="8"
-                                          IsVisible="{Binding ShowFixedPlayingActions}">
-                                        <Button Grid.Column="0"
-                                                Content="TAMBAH WAKTU"
-                                                Command="{Binding ExtendCommand}"
+                                    <StackPanel Grid.Row="4" Spacing="8">
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8"
+                                              IsVisible="{Binding ShowFixedPlayingActions}">
+                                            <Button Grid.Column="0"
+                                                    Content="TAMBAH WAKTU"
+                                                    Command="{Binding ExtendCommand}"
+                                                    Height="34"
+                                                    FontSize="11"
+                                                    Background="#1565C0"
+                                                    Foreground="White" />
+                                            <Button Grid.Column="1"
+                                                    Content="BAYAR"
+                                                    Command="{Binding PayCommand}"
+                                                    Height="34"
+                                                    FontSize="11"
+                                                    Background="#C62828"
+                                                    Foreground="White" />
+                                        </Grid>
+
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8"
+                                              IsVisible="{Binding ShowOpenEndedPay}">
+                                            <Button Grid.Column="0"
+                                                    Content="SLEEP TIMER"
+                                                    Command="{Binding SleepTimerCommand}"
+                                                    Height="34"
+                                                    FontSize="11"
+                                                    Background="#6A1B9A"
+                                                    Foreground="White" />
+                                            <Button Grid.Column="1"
+                                                    Content="BAYAR"
+                                                    Command="{Binding PayCommand}"
+                                                    Height="34"
+                                                    FontSize="11"
+                                                    FontWeight="SemiBold"
+                                                    Background="#C62828"
+                                                    Foreground="White" />
+                                        </Grid>
+
+                                        <Button Content="SLEEP TIMER"
+                                                Command="{Binding SleepTimerCommand}"
                                                 Height="34"
                                                 FontSize="11"
-                                                Background="#1565C0"
-                                                Foreground="White" />
-                                        <Button Grid.Column="1"
-                                                Content="BAYAR"
-                                                Command="{Binding PayCommand}"
+                                                Background="#6A1B9A"
+                                                Foreground="White"
+                                                IsVisible="{Binding ShowFixedPlayingActions}" />
+
+                                        <Button Content="START"
+                                                Command="{Binding StartCommand}"
                                                 Height="34"
-                                                FontSize="11"
-                                                Background="#C62828"
-                                                Foreground="White" />
-                                    </Grid>
-
-                                    <Button Grid.Row="4"
-                                            Content="BAYAR"
-                                            Command="{Binding PayCommand}"
-                                            Height="34"
-                                            FontSize="11"
-                                            FontWeight="SemiBold"
-                                            Background="#C62828"
-                                            Foreground="White"
-                                            IsVisible="{Binding ShowOpenEndedPay}" />
-
-                                    <Button Grid.Row="4"
-                                            Content="START"
-                                            Command="{Binding StartCommand}"
-                                            Height="34"
-                                            FontWeight="SemiBold"
-                                            Background="#2E7D32"
-                                            Foreground="White"
-                                            IsVisible="{Binding !IsPlaying}" />
+                                                FontWeight="SemiBold"
+                                                Background="#2E7D32"
+                                                Foreground="White"
+                                                IsVisible="{Binding !IsPlaying}" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>

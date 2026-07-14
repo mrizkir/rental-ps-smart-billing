@@ -168,6 +168,34 @@ class TestSamsungTVController:
         assert result["success"] is True
         assert "HDMI1" in result["message"]
 
+    @patch("tv_controller.time.sleep", return_value=None)
+    @patch("tv_controller.SamsungTVWS")
+    def test_set_sleep_timer_menu_sequence(self, mock_tv_class, _sleep, tv_controller):
+        mock_tv = MagicMock()
+        mock_tv_class.return_value = mock_tv
+
+        result = tv_controller.set_sleep_timer(30)
+
+        assert result["success"] is True
+        assert [call.args[0] for call in mock_tv.send_key.call_args_list] == [
+            "KEY_SLEEP",
+            "KEY_DOWN",
+            "KEY_ENTER",
+        ]
+
+    @patch("tv_controller.time.sleep", return_value=None)
+    @patch("tv_controller.SLEEP_TIMER_MODE", "cycle")
+    @patch("tv_controller.SamsungTVWS")
+    def test_set_sleep_timer_cycle_presses(self, mock_tv_class, _sleep, tv_controller):
+        mock_tv = MagicMock()
+        mock_tv_class.return_value = mock_tv
+
+        result = tv_controller.set_sleep_timer(30)
+
+        assert result["success"] is True
+        assert mock_tv.send_key.call_count == 1
+        mock_tv.send_key.assert_called_with("KEY_SLEEP")
+
     @patch("tv_controller.SamsungTVWS")
     def test_send_key_success(self, mock_tv_class, tv_controller):
         mock_tv = MagicMock()
@@ -191,14 +219,26 @@ class TestSamsungTVController:
     @patch("tv_controller.SamsungTVWS")
     def test_get_status_success(self, mock_tv_class, tv_controller):
         mock_tv = MagicMock()
-        mock_tv.rest_device_info.return_value = {"device": {"name": "Samsung TV"}}
+        mock_tv.rest_device_info.return_value = {
+            "device": {
+                "name": "[TV] Samsung",
+                "model": "43U8000F",
+                "PowerState": "on",
+                "OS": "Tizen",
+                "firmwareVersion": "T-NKLDEUC-1",
+                "wifiMac": "AA:BB:CC:DD:EE:FF",
+                "resolution": "3840x2160",
+                "networkType": "wired",
+            }
+        }
         mock_tv.token = "NEWxxxx"
         mock_tv_class.return_value = mock_tv
 
         result = tv_controller.get_status()
 
         assert result["success"] is True
-        assert result["data"]["device"]["name"] == "Samsung TV"
+        assert "43U8000F" in result["message"]
+        assert "Power: on" in result["message"]
         assert result["token"] == "NEWxxxx"
         mock_tv.open.assert_called_once()
         mock_tv.close.assert_called_once()

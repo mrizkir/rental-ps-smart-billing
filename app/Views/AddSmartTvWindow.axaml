@@ -20,11 +20,30 @@
             CornerRadius="10">
         <DockPanel>
             <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,12,0,0">
-                <TextBlock Text="{Binding TestMessage}"
-                           Foreground="#1565C0"
-                           TextWrapping="Wrap"
-                           MaxHeight="72"
-                           IsVisible="{Binding TestMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <StackPanel Spacing="6"
+                            IsVisible="{Binding TestMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right"
+                                Content="Salin"
+                                Command="{Binding CopyTestMessageCommand}"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Top"
+                                Padding="10,4" />
+                        <TextBox Text="{Binding TestMessage}"
+                                 IsReadOnly="True"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MaxHeight="160"
+                                 Background="#E3F2FD"
+                                 Foreground="#0D47A1"
+                                 FontFamily="Consolas,Courier New,monospace"
+                                 FontSize="12" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding CopyFeedback}"
+                               Foreground="#2E7D32"
+                               FontSize="11"
+                               IsVisible="{Binding CopyFeedback, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
 
                 <TextBlock Text="{Binding ErrorMessage}"
                            Foreground="#C62828"
@@ -74,6 +93,20 @@
                                   SelectedItem="{Binding SelectedBrand}"
                                   IsEnabled="{Binding !IsBusy}"
                                   HorizontalAlignment="Stretch" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Model TV" Foreground="#37474F" FontWeight="Medium" />
+                        <ComboBox ItemsSource="{Binding Models}"
+                                  SelectedItem="{Binding SelectedModel}"
+                                  IsEnabled="{Binding !IsBusy}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayLabel}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </StackPanel>
 
                     <StackPanel Spacing="6">

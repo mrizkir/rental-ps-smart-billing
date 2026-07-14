@@ -18,10 +18,22 @@ public interface IBillingService
         int sessionId,
         int packageId,
         CancellationToken cancellationToken = default);
+    Task<BillingResult> ExtendSessionByCustomAsync(
+        int sessionId,
+        int minutes,
+        decimal price,
+        CancellationToken cancellationToken = default);
     Task<BillingResult> EndSessionAsync(
         int sessionId,
         CancellationToken cancellationToken = default);
+    Task<BillingResult> ShowSleepTimerAsync(
+        int smartTvId,
+        CancellationToken cancellationToken = default);
     Task AutoEndExpiredAsync(CancellationToken cancellationToken = default);
+    Task<RevenueReportResult> GetRevenueReportAsync(
+        DateTime fromLocalDate,
+        DateTime toLocalDate,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class BillingService : IBillingService
@@ -29,17 +41,20 @@ public sealed class BillingService : IBillingService
     private readonly IRentalSessionRepository _sessions;
     private readonly IBillingPackageRepository _packages;
     private readonly ISmartTvRepository _smartTvs;
+    private readonly ITvModelService _tvModels;
     private readonly ITvApiClient _tvApi;
 
     public BillingService(
         IRentalSessionRepository sessions,
         IBillingPackageRepository packages,
         ISmartTvRepository smartTvs,
+        ITvModelService tvModels,
         ITvApiClient tvApi)
     {
         _sessions = sessions;
         _packages = packages;
         _smartTvs = smartTvs;
+        _tvModels = tvModels;
         _tvApi = tvApi;
     }
 
@@ -127,13 +142,6 @@ public sealed class BillingService : IBillingService
         int packageId,
         CancellationToken cancellationToken = default)
     {
-        var session = await _sessions.GetByIdAsync(sessionId, cancellationToken);
-        if (session is null || session.Status != "Active")
-            return BillingResult.Failed("Sesi aktif tidak ditemukan.");
-
-        if (session.IsOpenEnded || session.EndsAt is null)
-            return BillingResult.Failed("Sesi Free Play tidak bisa ditambah waktu. Akhiri dengan BAYAR.");
-
         var package = await _packages.GetByIdAsync(packageId, cancellationToken);
         if (package is null || !package.IsActive)
             return BillingResult.Failed("Paket tidak valid.");
@@ -141,9 +149,54 @@ public sealed class BillingService : IBillingService
         if (package.IsOpenEnded)
             return BillingResult.Failed("Tidak bisa menambah waktu dengan paket Free Play.");
 
+        return await ExtendSessionCoreAsync(
+            sessionId,
+            package.DurationMinutes,
+            package.Price,
+            package.Name,
+            cancellationToken);
+    }
+
+    public Task<BillingResult> ExtendSessionByCustomAsync(
+        int sessionId,
+        int minutes,
+        decimal price,
+        CancellationToken cancellationToken = default)
+    {
+        if (minutes < 1)
+            return Task.FromResult(BillingResult.Failed("Durasi minimal 1 menit."));
+
+        if (minutes > 1440)
+            return Task.FromResult(BillingResult.Failed("Durasi maksimal 1440 menit (24 jam)."));
+
+        if (price < 0)
+            return Task.FromResult(BillingResult.Failed("Harga tidak boleh negatif."));
+
+        return ExtendSessionCoreAsync(
+            sessionId,
+            minutes,
+            price,
+            $"+{minutes} menit",
+            cancellationToken);
+    }
+
+    private async Task<BillingResult> ExtendSessionCoreAsync(
+        int sessionId,
+        int minutes,
+        decimal price,
+        string label,
+        CancellationToken cancellationToken)
+    {
+        var session = await _sessions.GetByIdAsync(sessionId, cancellationToken);
+        if (session is null || session.Status != "Active")
+            return BillingResult.Failed("Sesi aktif tidak ditemukan.");
+
+        if (session.IsOpenEnded || session.EndsAt is null)
+            return BillingResult.Failed("Sesi Free Play tidak bisa ditambah waktu. Akhiri dengan BAYAR.");
+
         var baseTime = session.EndsAt.Value > DateTime.UtcNow ? session.EndsAt.Value : DateTime.UtcNow;
-        var newEndsAt = baseTime.AddMinutes(package.DurationMinutes);
-        var newAmount = (session.Amount ?? 0) + package.Price;
+        var newEndsAt = baseTime.AddMinutes(minutes);
+        var newAmount = (session.Amount ?? 0) + price;
 
         await _sessions.ExtendAsync(sessionId, newEndsAt, newAmount, cancellationToken);
 
@@ -157,7 +210,7 @@ public sealed class BillingService : IBillingService
                 tv.WsPort,
                 tv.Token,
                 tv.Name,
-                package.Name,
+                label,
                 session.CustomerName ?? "Guest",
                 cancellationToken);
             await PersistTokenAsync(tv.Id, tv.Token, splash, cancellationToken);
@@ -166,7 +219,7 @@ public sealed class BillingService : IBillingService
                 warning = $"Waktu ditambah, tetapi splash gagal: {splash.Message}";
         }
 
-        AppLog.Info($"Session extended: id={sessionId}, +{package.Name}");
+        AppLog.Info($"Session extended: id={sessionId}, {label}, +Rp {price:N0}");
         return BillingResult.Succeeded(warning, newAmount);
     }
 
@@ -184,8 +237,9 @@ public sealed class BillingService : IBillingService
         {
             var rate = session.PackagePrice ?? 0;
             amount = BillingCalculator.CalculateOpenEndedAmount(session.StartedAt, endedAt, rate);
-            var minutes = BillingCalculator.BillableMinutes(session.StartedAt, endedAt);
-            AppLog.Info($"Open-ended session billed: id={sessionId}, minutes={minutes}, amount={amount}");
+            var minutes = BillingCalculator.BillableOpenEndedMinutes(session.StartedAt, endedAt);
+            AppLog.Info(
+                $"Open-ended session billed: id={sessionId}, minutes={minutes} (grace={BillingCalculator.FreePlayGraceMinutes}), amount={amount}");
         }
         else
         {
@@ -218,6 +272,42 @@ public sealed class BillingService : IBillingService
         return BillingResult.Succeeded(warning, amount);
     }
 
+    public async Task<BillingResult> ShowSleepTimerAsync(
+        int smartTvId,
+        CancellationToken cancellationToken = default)
+    {
+        var tv = await _smartTvs.GetByIdAsync(smartTvId, cancellationToken);
+        if (tv is null || !tv.IsActive)
+            return BillingResult.Failed("Smart TV tidak ditemukan atau nonaktif.");
+
+        try
+        {
+            var profile = await _tvModels.ResolveSleepProfileForSmartTvAsync(smartTvId, cancellationToken);
+            var result = await _tvApi.SetSleepTimerAsync(
+                tv.IpAddress,
+                tv.MacAddress,
+                tv.WsPort,
+                tv.Token,
+                profile,
+                cancellationToken);
+            await PersistTokenAsync(tv.Id, tv.Token, result, cancellationToken);
+
+            if (!result.Success)
+                return BillingResult.Failed(result.Message);
+
+            var modelLabel = profile.ModelCode ?? "default";
+            AppLog.Info(
+                $"Sleep timer set: TV={tv.Name}, model={modelLabel}, mode={profile.Mode}, minutes={profile.Minutes}");
+            return BillingResult.Succeeded(
+                $"Sleep Timer ~{profile.Minutes} menit dikirim ke {tv.Name} ({modelLabel}).");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Sleep timer failed for TV id={smartTvId}", ex);
+            return BillingResult.Failed("Gagal mengirim Sleep Timer ke TV.");
+        }
+    }
+
     private async Task<string?> PersistTokenAsync(
         int smartTvId,
         string? currentToken,
@@ -248,5 +338,28 @@ public sealed class BillingService : IBillingService
                 AppLog.Error($"Failed to auto-end session {session.Id}", ex);
             }
         }
+    }
+
+    public async Task<RevenueReportResult> GetRevenueReportAsync(
+        DateTime fromLocalDate,
+        DateTime toLocalDate,
+        CancellationToken cancellationToken = default)
+    {
+        if (toLocalDate.Date < fromLocalDate.Date)
+            (fromLocalDate, toLocalDate) = (toLocalDate, fromLocalDate);
+
+        var fromUtc = DateTime.SpecifyKind(fromLocalDate.Date, DateTimeKind.Local).ToUniversalTime();
+        var toUtcExclusive = DateTime.SpecifyKind(toLocalDate.Date.AddDays(1), DateTimeKind.Local)
+            .ToUniversalTime();
+
+        var items = await _sessions.GetCompletedRevenueAsync(fromUtc, toUtcExclusive, cancellationToken);
+        return new RevenueReportResult
+        {
+            FromLocalDate = fromLocalDate.Date,
+            ToLocalDate = toLocalDate.Date,
+            SessionCount = items.Count,
+            TotalAmount = items.Sum(i => i.Amount),
+            Items = items
+        };
     }
 }

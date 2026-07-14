@@ -5,6 +5,8 @@ public sealed class SmartTvEditDetails
     public int Id { get; init; }
     public required string Name { get; init; }
     public required string Brand { get; init; }
+    public int? ModelId { get; init; }
+    public string? ModelCode { get; init; }
     public required string IpAddress { get; init; }
     public required string MacAddress { get; init; }
     public int WsPort { get; init; }

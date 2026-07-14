@@ -8,6 +8,7 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        WindowsConsole.EnsureAttached(args);
         AppLog.Configure(args);
         AppLog.Info("Program.Main started");
         AppLog.Info("Tip: dotnet run -- --verbose   atau   dotnet run -- --test-db");

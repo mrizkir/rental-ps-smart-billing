@@ -116,6 +116,49 @@ def tv_send_key():
     return _tv_action(lambda tv: tv.send_key(key))
 
 
+@app.route("/tv/sleep-timer", methods=["POST"])
+def tv_sleep_timer():
+    data = request.get_json(silent=True) or {}
+    minutes = data.get("minutes")
+    parsed_minutes = None
+    if minutes is not None and minutes != "":
+        try:
+            parsed_minutes = int(minutes)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "message": "Invalid minutes"}), 400
+
+    mode = data.get("mode")
+    key_delay = data.get("key_delay")
+    parsed_delay = None
+    if key_delay is not None and key_delay != "":
+        try:
+            parsed_delay = float(key_delay)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "message": "Invalid key_delay"}), 400
+
+    confirm_keys = data.get("confirm_keys")
+    parsed_keys = None
+    if isinstance(confirm_keys, list):
+        parsed_keys = [str(k).strip() for k in confirm_keys if str(k).strip()]
+    elif isinstance(confirm_keys, str) and confirm_keys.strip():
+        parsed_keys = [k.strip() for k in confirm_keys.split(",") if k.strip()]
+
+    logger.info(
+        "TV sleep-timer requested: minutes=%s mode=%s keys=%s",
+        parsed_minutes,
+        mode,
+        parsed_keys,
+    )
+    return _tv_action(
+        lambda tv: tv.set_sleep_timer(
+            parsed_minutes,
+            mode=str(mode) if mode else None,
+            confirm_keys=parsed_keys,
+            key_delay=parsed_delay,
+        )
+    )
+
+
 @app.route("/tv/open-browser", methods=["POST"])
 def tv_open_browser():
     data = request.get_json(silent=True) or {}

@@ -56,6 +56,30 @@ class TestTVEndpoints:
         assert response.status_code == 200
         mock_controller.send_key.assert_called_once_with("KEY_VOLUP")
 
+    @patch("tv_service.get_tv_controller")
+    def test_tv_sleep_timer(self, mock_get_controller, flask_client):
+        mock_controller = MagicMock()
+        mock_controller.set_sleep_timer.return_value = {"success": True, "message": "ok"}
+        mock_get_controller.return_value = mock_controller
+
+        response = flask_client.post(
+            "/tv/sleep-timer",
+            json={
+                "minutes": 30,
+                "mode": "menu",
+                "confirm_keys": "KEY_DOWN,KEY_ENTER",
+                "key_delay": 1.0,
+            },
+        )
+
+        assert response.status_code == 200
+        mock_controller.set_sleep_timer.assert_called_once_with(
+            30,
+            mode="menu",
+            confirm_keys=["KEY_DOWN", "KEY_ENTER"],
+            key_delay=1.0,
+        )
+
     def test_tv_send_key_missing_key(self, flask_client):
         response = flask_client.post("/tv/send-key", json={})
 

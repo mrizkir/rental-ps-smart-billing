@@ -1,0 +1,58 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:rental_ps_smart_billing.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="480" d:DesignHeight="600"
+        x:Class="rental_ps_smart_billing.Views.EditTvModelWindow"
+        x:DataType="vm:EditTvModelViewModel"
+        Title="Edit Model TV"
+        Width="480" Height="600"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#ECEFF1">
+
+    <Border Margin="16" Padding="20" Background="White" CornerRadius="10">
+        <StackPanel Spacing="10">
+            <TextBlock Text="Edit Model TV" FontSize="20" FontWeight="SemiBold" Foreground="#1A237E" />
+            <StackPanel Spacing="4">
+                <TextBlock Text="Kode Model" FontWeight="Medium" />
+                <TextBox Text="{Binding Code}" IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <TextBlock Text="Nama" FontWeight="Medium" />
+                <TextBox Text="{Binding Name}" IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <TextBlock Text="Merek" FontWeight="Medium" />
+                <TextBox Text="{Binding Brand}" IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <TextBlock Text="Mode Sleep Timer" FontWeight="Medium" />
+                <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}"
+                          HorizontalAlignment="Stretch" IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <TextBlock Text="Durasi (menit)" FontWeight="Medium" />
+                <TextBox Text="{Binding MinutesText}" IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+            <StackPanel Spacing="4">
+                <TextBlock Text="Delay antar tombol (detik)" FontWeight="Medium" />
+                <TextBox Text="{Binding KeyDelayText}" IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+            <StackPanel Spacing="4" IsVisible="{Binding ShowConfirmKeys}">
+                <TextBlock Text="Confirm keys (setelah KEY_SLEEP)" FontWeight="Medium" />
+                <TextBox Text="{Binding ConfirmKeysText}" IsEnabled="{Binding !IsBusy}" />
+            </StackPanel>
+            <CheckBox Content="Aktif" IsChecked="{Binding IsActive}" IsEnabled="{Binding !IsBusy}" />
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828" TextWrapping="Wrap"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+                <Button Grid.Column="0" Content="Batal" Command="{Binding CancelCommand}" Height="36" />
+                <Button Grid.Column="1" Content="Simpan" Command="{Binding SaveCommand}" Height="36"
+                        Background="#1565C0" Foreground="White" FontWeight="SemiBold" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

@@ -36,6 +36,22 @@ public interface ITvApiClient
         string durationLabel,
         string customerName,
         CancellationToken cancellationToken = default);
+
+    Task<TvConnectionTestResult> SendKeyAsync(
+        string ipAddress,
+        string macAddress,
+        int wsPort,
+        string? token,
+        string key,
+        CancellationToken cancellationToken = default);
+
+    Task<TvConnectionTestResult> SetSleepTimerAsync(
+        string ipAddress,
+        string macAddress,
+        int wsPort,
+        string? token,
+        SleepTimerProfile profile,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class TvApiClient : ITvApiClient, IDisposable
@@ -110,6 +126,44 @@ public sealed class TvApiClient : ITvApiClient, IDisposable
                 ["unit"] = unitName,
                 ["durasi"] = durationLabel,
                 ["nama"] = customerName
+            },
+            cancellationToken);
+
+    public Task<TvConnectionTestResult> SendKeyAsync(
+        string ipAddress,
+        string macAddress,
+        int wsPort,
+        string? token,
+        string key,
+        CancellationToken cancellationToken = default) =>
+        PostDeviceActionAsync(
+            "tv/send-key",
+            ipAddress,
+            macAddress,
+            wsPort,
+            token,
+            new Dictionary<string, object?> { ["key"] = key },
+            cancellationToken);
+
+    public Task<TvConnectionTestResult> SetSleepTimerAsync(
+        string ipAddress,
+        string macAddress,
+        int wsPort,
+        string? token,
+        SleepTimerProfile profile,
+        CancellationToken cancellationToken = default) =>
+        PostDeviceActionAsync(
+            "tv/sleep-timer",
+            ipAddress,
+            macAddress,
+            wsPort,
+            token,
+            new Dictionary<string, object?>
+            {
+                ["minutes"] = profile.Minutes,
+                ["mode"] = profile.Mode,
+                ["key_delay"] = profile.KeyDelaySeconds,
+                ["confirm_keys"] = string.Join(",", profile.ConfirmKeys)
             },
             cancellationToken);
 

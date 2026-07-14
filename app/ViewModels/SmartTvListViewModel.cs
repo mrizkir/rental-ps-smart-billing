@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using rental_ps_smart_billing.Models;
@@ -11,12 +12,17 @@ namespace rental_ps_smart_billing.ViewModels;
 public partial class SmartTvListViewModel : ViewModelBase
 {
     private readonly ISmartTvService _smartTvService;
+    private readonly ITvModelService _tvModelService;
     private readonly Action _closeDialog;
     private Window? _ownerWindow;
 
-    public SmartTvListViewModel(ISmartTvService smartTvService, Action closeDialog)
+    public SmartTvListViewModel(
+        ISmartTvService smartTvService,
+        ITvModelService tvModelService,
+        Action closeDialog)
     {
         _smartTvService = smartTvService;
+        _tvModelService = tvModelService;
         _closeDialog = closeDialog;
     }
 
@@ -32,7 +38,36 @@ public partial class SmartTvListViewModel : ViewModelBase
     private bool _isBusy;
 
     [ObservableProperty]
+    private string _copyFeedback = string.Empty;
+
+    [ObservableProperty]
     private SmartTvListItem? _selectedSmartTv;
+
+    public bool HasTestMessage => !string.IsNullOrWhiteSpace(TestMessage);
+
+    partial void OnTestMessageChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasTestMessage));
+        CopyTestMessageCommand.NotifyCanExecuteChanged();
+        CopyFeedback = string.Empty;
+    }
+
+    [RelayCommand(CanExecute = nameof(HasTestMessage))]
+    private async Task CopyTestMessageAsync()
+    {
+        if (_ownerWindow is null || string.IsNullOrWhiteSpace(TestMessage))
+            return;
+
+        var clipboard = TopLevel.GetTopLevel(_ownerWindow)?.Clipboard;
+        if (clipboard is null)
+        {
+            CopyFeedback = "Clipboard tidak tersedia.";
+            return;
+        }
+
+        await clipboard.SetTextAsync(TestMessage);
+        CopyFeedback = "Info TV disalin ke clipboard.";
+    }
 
     public bool HasSelection => SelectedSmartTv is not null;
 
@@ -85,6 +120,7 @@ public partial class SmartTvListViewModel : ViewModelBase
             var dialog = new AddSmartTvWindow();
             dialog.DataContext = new AddSmartTvViewModel(
                 _smartTvService,
+                _tvModelService,
                 () => dialog.Close());
 
             await dialog.ShowDialog(_ownerWindow);
@@ -115,6 +151,7 @@ public partial class SmartTvListViewModel : ViewModelBase
             var dialog = new EditSmartTvWindow();
             var viewModel = new EditSmartTvViewModel(
                 _smartTvService,
+                _tvModelService,
                 smartTv,
                 () => dialog.Close());
             dialog.DataContext = viewModel;
@@ -177,8 +214,11 @@ public partial class SmartTvListViewModel : ViewModelBase
         try
         {
             var result = await _smartTvService.TestConnectionAsync(SelectedSmartTv.Id, cancellationToken);
-            TestMessage = result.Message;
             await LoadAsync(cancellationToken);
+            // Set setelah LoadAsync agar tidak ter-clear.
+            TestMessage = result.Message;
+            if (!result.Success)
+                ErrorMessage = result.Message;
         }
         catch (Exception ex)
         {

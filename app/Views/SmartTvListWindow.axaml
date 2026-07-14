@@ -59,10 +59,36 @@
                         Padding="12,6" />
             </Grid>
 
-            <TextBlock Text="{Binding TestMessage}"
-                       Foreground="#1565C0"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding TestMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Border Background="#E3F2FD"
+                    CornerRadius="6"
+                    Padding="10,8"
+                    IsVisible="{Binding TestMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <StackPanel Spacing="6">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right"
+                                Content="Salin"
+                                Command="{Binding CopyTestMessageCommand}"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Top"
+                                Padding="10,4" />
+                        <TextBox Text="{Binding TestMessage}"
+                                 IsReadOnly="True"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MaxHeight="140"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Foreground="#0D47A1"
+                                 FontFamily="Consolas,Courier New,monospace"
+                                 FontSize="12"
+                                 CaretBrush="#0D47A1" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding CopyFeedback}"
+                               Foreground="#2E7D32"
+                               FontSize="11"
+                               IsVisible="{Binding CopyFeedback, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </Border>
 
             <TextBlock Text="{Binding ErrorMessage}"
                        Foreground="#C62828"
@@ -79,14 +105,15 @@
                         BorderBrush="#CFD8DC"
                         BorderThickness="0,0,0,1"
                         Padding="12,8">
-                    <Grid ColumnDefinitions="140,80,120,150,70,80,120">
+                    <Grid ColumnDefinitions="120,70,100,110,140,55,70,100">
                         <TextBlock Grid.Column="0" Text="Nama" FontWeight="SemiBold" Foreground="#37474F" />
                         <TextBlock Grid.Column="1" Text="Merek" FontWeight="SemiBold" Foreground="#37474F" />
-                        <TextBlock Grid.Column="2" Text="IP" FontWeight="SemiBold" Foreground="#37474F" />
-                        <TextBlock Grid.Column="3" Text="MAC" FontWeight="SemiBold" Foreground="#37474F" />
-                        <TextBlock Grid.Column="4" Text="Port" FontWeight="SemiBold" Foreground="#37474F" />
-                        <TextBlock Grid.Column="5" Text="Status" FontWeight="SemiBold" Foreground="#37474F" />
-                        <TextBlock Grid.Column="6" Text="Test Terakhir" FontWeight="SemiBold" Foreground="#37474F" />
+                        <TextBlock Grid.Column="2" Text="Model" FontWeight="SemiBold" Foreground="#37474F" />
+                        <TextBlock Grid.Column="3" Text="IP" FontWeight="SemiBold" Foreground="#37474F" />
+                        <TextBlock Grid.Column="4" Text="MAC" FontWeight="SemiBold" Foreground="#37474F" />
+                        <TextBlock Grid.Column="5" Text="Port" FontWeight="SemiBold" Foreground="#37474F" />
+                        <TextBlock Grid.Column="6" Text="Status" FontWeight="SemiBold" Foreground="#37474F" />
+                        <TextBlock Grid.Column="7" Text="Test" FontWeight="SemiBold" Foreground="#37474F" />
                     </Grid>
                 </Border>
 
@@ -100,14 +127,15 @@
                             <Border Padding="12,8"
                                     BorderBrush="#ECEFF1"
                                     BorderThickness="0,0,0,1">
-                                <Grid ColumnDefinitions="140,80,120,150,70,80,120">
+                                <Grid ColumnDefinitions="120,70,100,110,140,55,70,100">
                                     <TextBlock Grid.Column="0" Text="{Binding Name}" />
                                     <TextBlock Grid.Column="1" Text="{Binding Brand}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding IpAddress}" />
-                                    <TextBlock Grid.Column="3" Text="{Binding MacAddress}" />
-                                    <TextBlock Grid.Column="4" Text="{Binding WsPort}" />
-                                    <TextBlock Grid.Column="5" Text="{Binding Status}" />
-                                    <TextBlock Grid.Column="6" Text="{Binding LastTestDisplay}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding ModelDisplay}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding IpAddress}" />
+                                    <TextBlock Grid.Column="4" Text="{Binding MacAddress}" />
+                                    <TextBlock Grid.Column="5" Text="{Binding WsPort}" />
+                                    <TextBlock Grid.Column="6" Text="{Binding Status}" />
+                                    <TextBlock Grid.Column="7" Text="{Binding LastTestDisplay}" />
                                 </Grid>
                             </Border>
                         </DataTemplate>

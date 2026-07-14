@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using rental_ps_smart_billing.Models;
@@ -9,17 +11,22 @@ namespace rental_ps_smart_billing.ViewModels;
 public partial class EditSmartTvViewModel : ViewModelBase
 {
     private readonly ISmartTvService _smartTvService;
+    private readonly ITvModelService _tvModelService;
     private readonly int _smartTvId;
     private readonly Action _closeDialog;
+    private int? _initialModelId;
 
     public EditSmartTvViewModel(
         ISmartTvService smartTvService,
+        ITvModelService tvModelService,
         SmartTvEditDetails smartTv,
         Action closeDialog)
     {
         _smartTvService = smartTvService;
+        _tvModelService = tvModelService;
         _smartTvId = smartTv.Id;
         _closeDialog = closeDialog;
+        _initialModelId = smartTv.ModelId;
 
         ApplyDetails(smartTv);
 
@@ -29,40 +36,43 @@ public partial class EditSmartTvViewModel : ViewModelBase
         SelectedBrand = Brands.FirstOrDefault(b =>
             b.Equals(smartTv.Brand, StringComparison.OrdinalIgnoreCase))
             ?? Brands.FirstOrDefault();
+
+        _ = LoadModelsAsync();
     }
 
     public ObservableCollection<string> Brands { get; } = [];
+    public ObservableCollection<TvModelListItem> Models { get; } = [];
 
-    [ObservableProperty]
-    private string _name = string.Empty;
+    [ObservableProperty] private string _name = string.Empty;
+    [ObservableProperty] private string? _selectedBrand;
+    [ObservableProperty] private TvModelListItem? _selectedModel;
+    [ObservableProperty] private string _ipAddress = string.Empty;
+    [ObservableProperty] private string _macAddress = string.Empty;
+    [ObservableProperty] private string _wsPortText = "8002";
+    [ObservableProperty] private string _pairingToken = string.Empty;
+    [ObservableProperty] private bool _isActive = true;
+    [ObservableProperty] private string _errorMessage = string.Empty;
+    [ObservableProperty] private string _testMessage = string.Empty;
+    [ObservableProperty] private string _copyFeedback = string.Empty;
+    [ObservableProperty] private bool _isBusy;
 
-    [ObservableProperty]
-    private string? _selectedBrand;
+    private async Task LoadModelsAsync()
+    {
+        try
+        {
+            var models = await _tvModelService.GetActiveModelsAsync();
+            Models.Clear();
+            foreach (var model in models)
+                Models.Add(model);
 
-    [ObservableProperty]
-    private string _ipAddress = string.Empty;
-
-    [ObservableProperty]
-    private string _macAddress = string.Empty;
-
-    [ObservableProperty]
-    private string _wsPortText = "8002";
-
-    /// <summary>Token pairing TV (nilai string dari DB), bukan path file.</summary>
-    [ObservableProperty]
-    private string _pairingToken = string.Empty;
-
-    [ObservableProperty]
-    private bool _isActive = true;
-
-    [ObservableProperty]
-    private string _errorMessage = string.Empty;
-
-    [ObservableProperty]
-    private string _testMessage = string.Empty;
-
-    [ObservableProperty]
-    private bool _isBusy;
+            SelectedModel = Models.FirstOrDefault(m => m.Id == _initialModelId)
+                            ?? Models.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Load TV models for Edit Smart TV failed", ex);
+        }
+    }
 
     public async Task ReloadFromDbAsync(CancellationToken cancellationToken = default)
     {
@@ -71,10 +81,13 @@ public partial class EditSmartTvViewModel : ViewModelBase
             return;
 
         ApplyDetails(latest);
+        _initialModelId = latest.ModelId;
 
         SelectedBrand = Brands.FirstOrDefault(b =>
             b.Equals(latest.Brand, StringComparison.OrdinalIgnoreCase))
             ?? SelectedBrand;
+
+        SelectedModel = Models.FirstOrDefault(m => m.Id == latest.ModelId) ?? SelectedModel;
     }
 
     private void ApplyDetails(SmartTvEditDetails smartTv)
@@ -97,7 +110,6 @@ public partial class EditSmartTvViewModel : ViewModelBase
 
         try
         {
-            // Simpan dulu perubahan form (IP/MAC/port/token) agar test memakai data terbaru
             if (!TryParseWsPort(out var wsPort))
                 return;
 
@@ -105,6 +117,7 @@ public partial class EditSmartTvViewModel : ViewModelBase
                 _smartTvId,
                 Name,
                 SelectedBrand ?? string.Empty,
+                SelectedModel?.Id,
                 IpAddress,
                 MacAddress,
                 wsPort,
@@ -118,11 +131,8 @@ public partial class EditSmartTvViewModel : ViewModelBase
                 return;
             }
 
-            // Test by id: update LastTest* + Token di DB jika Python mengembalikan token
             var result = await _smartTvService.TestConnectionAsync(_smartTvId, cancellationToken);
             TestMessage = result.Message;
-
-            // Selalu muat ulang dari DB agar token yang tersimpan tampil di form
             await ReloadFromDbAsync(cancellationToken);
 
             if (result.Success && !string.IsNullOrWhiteSpace(result.Token))
@@ -157,6 +167,7 @@ public partial class EditSmartTvViewModel : ViewModelBase
                 _smartTvId,
                 Name,
                 SelectedBrand ?? string.Empty,
+                SelectedModel?.Id,
                 IpAddress,
                 MacAddress,
                 wsPort,
@@ -187,8 +198,39 @@ public partial class EditSmartTvViewModel : ViewModelBase
     [RelayCommand]
     private void Cancel() => _closeDialog();
 
-    private bool CanSave() => !IsBusy;
+    public bool HasTestMessage => !string.IsNullOrWhiteSpace(TestMessage);
 
+    partial void OnTestMessageChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasTestMessage));
+        CopyTestMessageCommand.NotifyCanExecuteChanged();
+        CopyFeedback = string.Empty;
+    }
+
+    [RelayCommand(CanExecute = nameof(HasTestMessage))]
+    private async Task CopyTestMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TestMessage))
+            return;
+
+        if (Avalonia.Application.Current?.ApplicationLifetime is
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.Windows.Count > 0)
+        {
+            var window = desktop.Windows.FirstOrDefault(w => w.IsActive) ?? desktop.MainWindow;
+            var clipboard = window is null ? null : TopLevel.GetTopLevel(window)?.Clipboard;
+            if (clipboard is not null)
+            {
+                await clipboard.SetTextAsync(TestMessage);
+                CopyFeedback = "Info TV disalin ke clipboard.";
+                return;
+            }
+        }
+
+        CopyFeedback = "Clipboard tidak tersedia.";
+    }
+
+    private bool CanSave() => !IsBusy;
     private bool CanTest() => !IsBusy;
 
     private bool TryParseWsPort(out int wsPort)

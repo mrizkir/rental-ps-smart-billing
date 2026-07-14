@@ -14,6 +14,7 @@ public interface ISmartTvService
     Task<SmartTvResult> CreateAsync(
         string name,
         string brand,
+        int? modelId,
         string ipAddress,
         string macAddress,
         int wsPort,
@@ -23,6 +24,7 @@ public interface ISmartTvService
         int id,
         string name,
         string brand,
+        int? modelId,
         string ipAddress,
         string macAddress,
         int wsPort,
@@ -64,6 +66,7 @@ public sealed class SmartTvService : ISmartTvService
     public async Task<SmartTvResult> CreateAsync(
         string name,
         string brand,
+        int? modelId,
         string ipAddress,
         string macAddress,
         int wsPort,
@@ -77,6 +80,7 @@ public sealed class SmartTvService : ISmartTvService
         await _repository.CreateAsync(
             name.Trim(),
             brand.Trim(),
+            modelId,
             ipAddress.Trim(),
             NormalizeMac(macAddress),
             wsPort,
@@ -91,6 +95,7 @@ public sealed class SmartTvService : ISmartTvService
         int id,
         string name,
         string brand,
+        int? modelId,
         string ipAddress,
         string macAddress,
         int wsPort,
@@ -111,6 +116,7 @@ public sealed class SmartTvService : ISmartTvService
             id,
             name.Trim(),
             brand.Trim(),
+            modelId,
             ipAddress.Trim(),
             NormalizeMac(macAddress),
             wsPort,

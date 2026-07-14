@@ -12,6 +12,7 @@ public interface ISmartTvRepository
     Task CreateAsync(
         string name,
         string brand,
+        int? modelId,
         string ipAddress,
         string macAddress,
         int wsPort,
@@ -21,6 +22,7 @@ public interface ISmartTvRepository
         int id,
         string name,
         string brand,
+        int? modelId,
         string ipAddress,
         string macAddress,
         int wsPort,
@@ -53,17 +55,19 @@ public sealed class SmartTvRepository : ISmartTvRepository
         await using var command = new SqlCommand(
             """
             SELECT
-                Id,
-                Name,
-                Brand,
-                IpAddress,
-                MacAddress,
-                WsPort,
-                IsActive,
-                LastTestStatus,
-                LastTestAt
-            FROM SmartTvs
-            ORDER BY Name
+                t.Id,
+                t.Name,
+                t.Brand,
+                m.Code,
+                t.IpAddress,
+                t.MacAddress,
+                t.WsPort,
+                t.IsActive,
+                t.LastTestStatus,
+                t.LastTestAt
+            FROM SmartTvs t
+            LEFT JOIN TvModels m ON m.Id = t.ModelId
+            ORDER BY t.Name
             """,
             connection);
 
@@ -76,12 +80,13 @@ public sealed class SmartTvRepository : ISmartTvRepository
                 Id = reader.GetInt32(0),
                 Name = reader.GetString(1),
                 Brand = reader.GetString(2),
-                IpAddress = reader.GetString(3),
-                MacAddress = reader.GetString(4),
-                WsPort = reader.GetInt32(5),
-                IsActive = reader.GetBoolean(6),
-                LastTestStatus = reader.IsDBNull(7) ? null : reader.GetString(7),
-                LastTestAt = reader.IsDBNull(8) ? null : reader.GetDateTime(8)
+                ModelCode = reader.IsDBNull(3) ? null : reader.GetString(3),
+                IpAddress = reader.GetString(4),
+                MacAddress = reader.GetString(5),
+                WsPort = reader.GetInt32(6),
+                IsActive = reader.GetBoolean(7),
+                LastTestStatus = reader.IsDBNull(8) ? null : reader.GetString(8),
+                LastTestAt = reader.IsDBNull(9) ? null : reader.GetDateTime(9)
             });
         }
 
@@ -96,16 +101,19 @@ public sealed class SmartTvRepository : ISmartTvRepository
         await using var command = new SqlCommand(
             """
             SELECT
-                Id,
-                Name,
-                Brand,
-                IpAddress,
-                MacAddress,
-                WsPort,
-                Token,
-                IsActive
-            FROM SmartTvs
-            WHERE Id = @Id
+                t.Id,
+                t.Name,
+                t.Brand,
+                t.ModelId,
+                m.Code,
+                t.IpAddress,
+                t.MacAddress,
+                t.WsPort,
+                t.Token,
+                t.IsActive
+            FROM SmartTvs t
+            LEFT JOIN TvModels m ON m.Id = t.ModelId
+            WHERE t.Id = @Id
             """,
             connection);
         command.Parameters.AddWithValue("@Id", id);
@@ -124,6 +132,12 @@ public sealed class SmartTvRepository : ISmartTvRepository
             Id = reader.GetInt32(reader.GetOrdinal("Id")),
             Name = reader.GetString(reader.GetOrdinal("Name")),
             Brand = reader.GetString(reader.GetOrdinal("Brand")),
+            ModelId = reader.IsDBNull(reader.GetOrdinal("ModelId"))
+                ? null
+                : reader.GetInt32(reader.GetOrdinal("ModelId")),
+            ModelCode = reader.IsDBNull(reader.GetOrdinal("Code"))
+                ? null
+                : reader.GetString(reader.GetOrdinal("Code")),
             IpAddress = reader.GetString(reader.GetOrdinal("IpAddress")),
             MacAddress = reader.GetString(reader.GetOrdinal("MacAddress")),
             WsPort = reader.GetInt32(reader.GetOrdinal("WsPort")),
@@ -183,6 +197,7 @@ public sealed class SmartTvRepository : ISmartTvRepository
     public async Task CreateAsync(
         string name,
         string brand,
+        int? modelId,
         string ipAddress,
         string macAddress,
         int wsPort,
@@ -194,12 +209,13 @@ public sealed class SmartTvRepository : ISmartTvRepository
 
         await using var command = new SqlCommand(
             """
-            INSERT INTO SmartTvs (Name, Brand, IpAddress, MacAddress, WsPort, Token)
-            VALUES (@Name, @Brand, @IpAddress, @MacAddress, @WsPort, @Token)
+            INSERT INTO SmartTvs (Name, Brand, ModelId, IpAddress, MacAddress, WsPort, Token)
+            VALUES (@Name, @Brand, @ModelId, @IpAddress, @MacAddress, @WsPort, @Token)
             """,
             connection);
         command.Parameters.AddWithValue("@Name", name);
         command.Parameters.AddWithValue("@Brand", brand);
+        command.Parameters.AddWithValue("@ModelId", (object?)modelId ?? DBNull.Value);
         command.Parameters.AddWithValue("@IpAddress", ipAddress);
         command.Parameters.AddWithValue("@MacAddress", macAddress);
         command.Parameters.AddWithValue("@WsPort", wsPort);
@@ -212,6 +228,7 @@ public sealed class SmartTvRepository : ISmartTvRepository
         int id,
         string name,
         string brand,
+        int? modelId,
         string ipAddress,
         string macAddress,
         int wsPort,
@@ -227,6 +244,7 @@ public sealed class SmartTvRepository : ISmartTvRepository
             UPDATE SmartTvs
             SET Name = @Name,
                 Brand = @Brand,
+                ModelId = @ModelId,
                 IpAddress = @IpAddress,
                 MacAddress = @MacAddress,
                 WsPort = @WsPort,
@@ -239,6 +257,7 @@ public sealed class SmartTvRepository : ISmartTvRepository
         command.Parameters.AddWithValue("@Id", id);
         command.Parameters.AddWithValue("@Name", name);
         command.Parameters.AddWithValue("@Brand", brand);
+        command.Parameters.AddWithValue("@ModelId", (object?)modelId ?? DBNull.Value);
         command.Parameters.AddWithValue("@IpAddress", ipAddress);
         command.Parameters.AddWithValue("@MacAddress", macAddress);
         command.Parameters.AddWithValue("@WsPort", wsPort);

@@ -1,0 +1,73 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:rental_ps_smart_billing.ViewModels"
+        xmlns:models="using:rental_ps_smart_billing.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="900" d:DesignHeight="520"
+        x:Class="rental_ps_smart_billing.Views.TvModelListWindow"
+        x:DataType="vm:TvModelListViewModel"
+        Title="Daftar Model TV"
+        Width="900" Height="520"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="#FAFAFA">
+
+    <DockPanel Margin="20">
+        <StackPanel DockPanel.Dock="Top" Spacing="12" Margin="0,0,0,16">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0"
+                           Text="Model Smart TV"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           Foreground="#1A237E"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Tambah" Command="{Binding AddModelCommand}"
+                        Background="#1565C0" Foreground="White" FontWeight="SemiBold" Padding="12,6"
+                        IsEnabled="{Binding !IsBusy}" />
+                <Button Grid.Column="2" Content="Edit" Command="{Binding EditModelCommand}" Padding="12,6"
+                        IsEnabled="{Binding !IsBusy}" />
+                <Button Grid.Column="3" Content="Hapus" Command="{Binding DeleteModelCommand}"
+                        Background="#C62828" Foreground="White" Padding="12,6"
+                        IsEnabled="{Binding !IsBusy}" />
+                <Button Grid.Column="4" Content="Refresh" Command="{Binding RefreshCommand}" Padding="12,6"
+                        IsEnabled="{Binding !IsBusy}" />
+                <Button Grid.Column="5" Content="Tutup" Command="{Binding CloseCommand}" Padding="12,6" />
+            </Grid>
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <Border Background="White" BorderBrush="#CFD8DC" BorderThickness="1" CornerRadius="6">
+            <Grid RowDefinitions="Auto,*">
+                <Border Grid.Row="0" Background="#ECEFF1" BorderBrush="#CFD8DC"
+                        BorderThickness="0,0,0,1" Padding="12,8">
+                    <Grid ColumnDefinitions="140,*,120,160,100">
+                        <TextBlock Grid.Column="0" Text="Kode" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Nama" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="Merek" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="Sleep Timer" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="4" Text="Status" FontWeight="SemiBold" />
+                    </Grid>
+                </Border>
+                <ListBox Grid.Row="1" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}"
+                         IsEnabled="{Binding !IsBusy}" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:TvModelListItem">
+                            <Border Padding="12,8" BorderBrush="#ECEFF1" BorderThickness="0,0,0,1">
+                                <Grid ColumnDefinitions="140,*,120,160,100">
+                                    <TextBlock Grid.Column="0" Text="{Binding Code}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Brand}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding SleepDisplay}" />
+                                    <TextBlock Grid.Column="4" Text="{Binding Status}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+    </DockPanel>
+</Window>

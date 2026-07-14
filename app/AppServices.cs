@@ -10,6 +10,7 @@ public static class AppServices
     public static IAuthService Auth { get; private set; } = null!;
     public static IUserService Users { get; private set; } = null!;
     public static ISmartTvService SmartTvs { get; private set; } = null!;
+    public static ITvModelService TvModels { get; private set; } = null!;
     public static IBillingPackageService Packages { get; private set; } = null!;
     public static IBillingService Billing { get; private set; } = null!;
     public static bool IsInitialized { get; private set; }
@@ -63,18 +64,43 @@ public static class AppServices
 
         var userRepository = new UserRepository(connectionFactory);
         var smartTvRepository = new SmartTvRepository(connectionFactory);
+        var tvModelRepository = new TvModelRepository(connectionFactory);
         var packageRepository = new BillingPackageRepository(connectionFactory);
         var sessionRepository = new RentalSessionRepository(connectionFactory);
 
         var tvBaseUrl = configuration["TvService:BaseUrl"] ?? "http://127.0.0.1:5001";
         var tvApiClient = new TvApiClient(tvBaseUrl);
 
+        var graceMinutes = configuration.GetValue("Billing:FreePlayGraceMinutes", 5);
+        if (graceMinutes < 0)
+            graceMinutes = 0;
+        BillingCalculator.FreePlayGraceMinutes = graceMinutes;
+        AppLog.Info($"Free Play grace minutes: {BillingCalculator.FreePlayGraceMinutes}");
+
+        var sleepWarnMinutes = configuration.GetValue("Billing:SleepTimerWarnMinutesBeforeEnd", 5);
+        if (sleepWarnMinutes < 0)
+            sleepWarnMinutes = 0;
+        BillingCalculator.SleepTimerWarnMinutesBeforeEnd = sleepWarnMinutes;
+        AppLog.Info($"Sleep timer auto-warn minutes: {BillingCalculator.SleepTimerWarnMinutesBeforeEnd}");
+
+        var sleepTimerMinutes = configuration.GetValue("Billing:SleepTimerMinutes", 30);
+        if (sleepTimerMinutes < 1)
+            sleepTimerMinutes = 30;
+        BillingCalculator.SleepTimerMinutes = sleepTimerMinutes;
+        AppLog.Info($"Sleep timer TV duration minutes: {BillingCalculator.SleepTimerMinutes}");
+
         Session = new SessionService();
         Auth = new AuthService(userRepository);
         Users = new UserService(userRepository);
         SmartTvs = new SmartTvService(smartTvRepository, tvApiClient);
+        TvModels = new TvModelService(tvModelRepository);
         Packages = new BillingPackageService(packageRepository);
-        Billing = new BillingService(sessionRepository, packageRepository, smartTvRepository, tvApiClient);
+        Billing = new BillingService(
+            sessionRepository,
+            packageRepository,
+            smartTvRepository,
+            TvModels,
+            tvApiClient);
         IsInitialized = true;
 
         AppLog.Info("AppServices.Initialize completed");

@@ -10,6 +10,7 @@ public partial class UnitCardViewModel : ViewModelBase
     private readonly Func<UnitCardViewModel, Task> _startAsync;
     private readonly Func<UnitCardViewModel, Task> _extendAsync;
     private readonly Func<UnitCardViewModel, Task> _payAsync;
+    private readonly Func<UnitCardViewModel, Task> _sleepTimerAsync;
 
     public UnitCardViewModel(
         UnitCardItem item,
@@ -17,11 +18,13 @@ public partial class UnitCardViewModel : ViewModelBase
         bool canEnd,
         Func<UnitCardViewModel, Task> startAsync,
         Func<UnitCardViewModel, Task> extendAsync,
-        Func<UnitCardViewModel, Task> payAsync)
+        Func<UnitCardViewModel, Task> payAsync,
+        Func<UnitCardViewModel, Task> sleepTimerAsync)
     {
         _startAsync = startAsync;
         _extendAsync = extendAsync;
         _payAsync = payAsync;
+        _sleepTimerAsync = sleepTimerAsync;
         CanStart = canStart;
         CanEnd = canEnd;
         Apply(item);
@@ -54,6 +57,9 @@ public partial class UnitCardViewModel : ViewModelBase
     private string _packageDisplay = "-";
 
     [ObservableProperty]
+    private string _startedAtDisplay = "-";
+
+    [ObservableProperty]
     private string _amountDisplay = "Rp 0";
 
     [ObservableProperty]
@@ -71,6 +77,7 @@ public partial class UnitCardViewModel : ViewModelBase
     public bool CanExtend => IsPlaying && !IsOpenEnded;
     public bool ShowOpenEndedPay => IsPlaying && IsOpenEnded;
     public bool ShowFixedPlayingActions => IsPlaying && !IsOpenEnded;
+    public bool ShowSleepTimer => IsPlaying;
 
     public void Apply(UnitCardItem item)
     {
@@ -86,6 +93,7 @@ public partial class UnitCardViewModel : ViewModelBase
         PackagePrice = item.PackagePrice;
         StartedAt = item.StartedAt;
         EndsAt = item.EndsAt;
+        StartedAtDisplay = FormatStartedAt(item.StartedAt);
         RefreshTimer(DateTime.UtcNow);
         NotifyPlayingLayout();
     }
@@ -102,6 +110,7 @@ public partial class UnitCardViewModel : ViewModelBase
         EndsAt = null;
         CustomerDisplay = "-";
         PackageDisplay = "-";
+        StartedAtDisplay = "-";
         FixedAmount = 0;
         PackagePrice = 0;
         StatusLabel = "AVAILABLE";
@@ -157,6 +166,21 @@ public partial class UnitCardViewModel : ViewModelBase
     public bool IsExpired(DateTime utcNow) =>
         IsPlaying && !IsOpenEnded && EndsAt is not null && EndsAt.Value <= utcNow;
 
+    public bool NeedsSleepTimerWarn(DateTime utcNow, int warnMinutesBeforeEnd)
+    {
+        if (warnMinutesBeforeEnd <= 0 || !IsPlaying || IsOpenEnded || EndsAt is null || SessionId is null)
+            return false;
+
+        var remaining = EndsAt.Value - utcNow;
+        return remaining > TimeSpan.Zero
+               && remaining <= TimeSpan.FromMinutes(warnMinutesBeforeEnd);
+    }
+
+    private static string FormatStartedAt(DateTime? startedAtUtc) =>
+        startedAtUtc is null
+            ? "-"
+            : startedAtUtc.Value.ToLocalTime().ToString("HH:mm");
+
     [RelayCommand(CanExecute = nameof(CanExecuteStart))]
     private Task StartAsync() => _startAsync(this);
 
@@ -165,6 +189,9 @@ public partial class UnitCardViewModel : ViewModelBase
 
     [RelayCommand(CanExecute = nameof(CanExecutePlayingAction))]
     private Task PayAsync() => _payAsync(this);
+
+    [RelayCommand(CanExecute = nameof(CanExecutePlayingAction))]
+    private Task SleepTimerAsync() => _sleepTimerAsync(this);
 
     private bool CanExecuteStart() => CanStart && !IsPlaying;
 
@@ -177,6 +204,7 @@ public partial class UnitCardViewModel : ViewModelBase
         StartCommand.NotifyCanExecuteChanged();
         ExtendCommand.NotifyCanExecuteChanged();
         PayCommand.NotifyCanExecuteChanged();
+        SleepTimerCommand.NotifyCanExecuteChanged();
         NotifyPlayingLayout();
     }
 
@@ -191,5 +219,6 @@ public partial class UnitCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanExtend));
         OnPropertyChanged(nameof(ShowOpenEndedPay));
         OnPropertyChanged(nameof(ShowFixedPlayingActions));
+        OnPropertyChanged(nameof(ShowSleepTimer));
     }
 }

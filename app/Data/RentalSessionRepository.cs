@@ -28,6 +28,10 @@ public interface IRentalSessionRepository
         DateTime endedAt,
         decimal amount,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<RevenueReportItem>> GetCompletedRevenueAsync(
+        DateTime fromUtcInclusive,
+        DateTime toUtcExclusive,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class RentalSessionRepository : IRentalSessionRepository
@@ -252,6 +256,58 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
         var rows = await command.ExecuteNonQueryAsync(cancellationToken);
         if (rows == 0)
             throw new InvalidOperationException("Sesi aktif tidak ditemukan.");
+    }
+
+    public async Task<IReadOnlyList<RevenueReportItem>> GetCompletedRevenueAsync(
+        DateTime fromUtcInclusive,
+        DateTime toUtcExclusive,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new SqlCommand(
+            """
+            SELECT
+                s.Id,
+                t.Name,
+                s.CustomerName,
+                p.Name,
+                ISNULL(p.BillingMode, 'Fixed'),
+                s.StartedAt,
+                s.EndedAt,
+                ISNULL(s.Amount, 0)
+            FROM RentalSessions s
+            INNER JOIN SmartTvs t ON t.Id = s.SmartTvId
+            LEFT JOIN BillingPackages p ON p.Id = s.PackageId
+            WHERE s.Status = 'Completed'
+              AND s.EndedAt IS NOT NULL
+              AND s.EndedAt >= @FromUtc
+              AND s.EndedAt < @ToUtc
+            ORDER BY s.EndedAt DESC, s.Id DESC
+            """,
+            connection);
+        command.Parameters.AddWithValue("@FromUtc", fromUtcInclusive);
+        command.Parameters.AddWithValue("@ToUtc", toUtcExclusive);
+
+        var items = new List<RevenueReportItem>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(new RevenueReportItem
+            {
+                SessionId = reader.GetInt32(0),
+                TvName = reader.GetString(1),
+                CustomerName = reader.IsDBNull(2) ? null : reader.GetString(2),
+                PackageName = reader.IsDBNull(3) ? null : reader.GetString(3),
+                BillingMode = reader.GetString(4),
+                StartedAt = DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc),
+                EndedAt = DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc),
+                Amount = reader.GetDecimal(7)
+            });
+        }
+
+        return items;
     }
 
     private static async Task<RentalSession?> ReadSessionAsync(SqlCommand command, CancellationToken cancellationToken)

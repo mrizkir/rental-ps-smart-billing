@@ -3,7 +3,22 @@ namespace rental_ps_smart_billing.Services;
 public static class BillingCalculator
 {
     /// <summary>
-    /// Menit tagihan dengan pembulatan matematika standar (≥ 0.5 naik).
+    /// Menit awal Free Play yang tidak ditagih. Diisi dari appsettings Billing:FreePlayGraceMinutes.
+    /// </summary>
+    public static int FreePlayGraceMinutes { get; set; } = 5;
+
+    /// <summary>
+    /// Berapa menit sebelum EndsAt otomatis kirim Sleep Timer. 0 = nonaktif.
+    /// </summary>
+    public static int SleepTimerWarnMinutesBeforeEnd { get; set; } = 5;
+
+    /// <summary>
+    /// Durasi Sleep Timer yang dipilih di TV (biasanya 30/60/90…).
+    /// </summary>
+    public static int SleepTimerMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// Menit tagihan dengan pembulatan matematika standar (≥ 0.5 naik), tanpa grace.
     /// </summary>
     public static int BillableMinutes(DateTime startedAt, DateTime endedAt)
     {
@@ -14,9 +29,18 @@ public static class BillingCalculator
         return (int)Math.Round(elapsed.TotalMinutes, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>
+    /// Menit Free Play setelah dikurangi grace (minimal 0).
+    /// </summary>
+    public static int BillableOpenEndedMinutes(DateTime startedAt, DateTime endedAt)
+    {
+        var grace = Math.Max(0, FreePlayGraceMinutes);
+        return Math.Max(0, BillableMinutes(startedAt, endedAt) - grace);
+    }
+
     public static decimal CalculateOpenEndedAmount(DateTime startedAt, DateTime endedAt, decimal pricePerMinute)
     {
-        var minutes = BillableMinutes(startedAt, endedAt);
+        var minutes = BillableOpenEndedMinutes(startedAt, endedAt);
         return minutes * pricePerMinute;
     }
 }
