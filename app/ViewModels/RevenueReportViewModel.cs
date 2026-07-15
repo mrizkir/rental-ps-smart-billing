@@ -26,8 +26,8 @@ public partial class RevenueReportViewModel : ViewModelBase
 
     public ObservableCollection<RevenueReportItem> Items { get; } = [];
 
-    [ObservableProperty] private DateTimeOffset? _fromDate;
-    [ObservableProperty] private DateTimeOffset? _toDate;
+    [ObservableProperty] private DateTime? _fromDate;
+    [ObservableProperty] private DateTime? _toDate;
     [ObservableProperty] private string _periodDisplay = "-";
     [ObservableProperty] private string _sessionCountDisplay = "0";
     [ObservableProperty] private string _totalAmountDisplay = "Rp 0";

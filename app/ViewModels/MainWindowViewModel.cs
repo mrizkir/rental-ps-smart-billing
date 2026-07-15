@@ -23,6 +23,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _isRefreshing;
     private bool _disposed;
     private bool _isSendingSleepWarn;
+    private CancellationTokenSource? _tvStatusCts;
 
     public MainWindowViewModel(
         ISessionService session,
@@ -104,6 +105,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             StatusMessage = Units.Count == 0
                 ? "Belum ada Smart TV aktif. Tambah TV lewat menu Smart TV."
                 : string.Empty;
+
+            _ = RefreshTvOnlineStatusesAsync();
         }
         catch (Exception ex)
         {
@@ -114,6 +117,42 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             IsBusy = false;
         }
+    }
+
+    private async Task RefreshTvOnlineStatusesAsync()
+    {
+        if (_smartTvService is null)
+            return;
+
+        _tvStatusCts?.Cancel();
+        _tvStatusCts?.Dispose();
+        _tvStatusCts = new CancellationTokenSource();
+        var cancellationToken = _tvStatusCts.Token;
+        var units = Units.ToList();
+
+        var tasks = units.Select(async unit =>
+        {
+            try
+            {
+                var result = await _smartTvService.TestConnectionAsync(
+                    unit.ToTestRequest(),
+                    cancellationToken);
+                if (!cancellationToken.IsCancellationRequested)
+                    unit.SetTvOnline(result.Success);
+            }
+            catch (OperationCanceledException)
+            {
+                // Refresh berikutnya membatalkan pengecekan sebelumnya.
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"TV online check failed for {unit.TvName}", ex);
+                if (!cancellationToken.IsCancellationRequested)
+                    unit.SetTvOnline(false);
+            }
+        });
+
+        await Task.WhenAll(tasks);
     }
 
     private async void OnTimerTick(object? sender, EventArgs e)
@@ -604,6 +643,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (_disposed)
             return;
         _disposed = true;
+        _tvStatusCts?.Cancel();
+        _tvStatusCts?.Dispose();
         _timer.Stop();
         _timer.Tick -= OnTimerTick;
     }

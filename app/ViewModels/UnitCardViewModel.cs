@@ -35,6 +35,11 @@ public partial class UnitCardViewModel : ViewModelBase
     public bool CanStart { get; }
     public bool CanEnd { get; }
 
+    private string _ipAddress = string.Empty;
+    private string _macAddress = string.Empty;
+    private int _wsPort;
+    private string? _token;
+
     [ObservableProperty]
     private string _tvName = string.Empty;
 
@@ -46,6 +51,14 @@ public partial class UnitCardViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isOpenEnded;
+
+    /// <summary>null = checking / unknown, true = online, false = offline.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowTvOnline))]
+    [NotifyPropertyChangedFor(nameof(ShowTvOffline))]
+    [NotifyPropertyChangedFor(nameof(ShowTvStatusUnknown))]
+    [NotifyPropertyChangedFor(nameof(TvOnlineToolTip))]
+    private bool? _isTvOnline;
 
     [ObservableProperty]
     private string _timerDisplay = "--:--:--";
@@ -78,15 +91,37 @@ public partial class UnitCardViewModel : ViewModelBase
     public bool ShowOpenEndedPay => IsPlaying && IsOpenEnded;
     public bool ShowFixedPlayingActions => IsPlaying && !IsOpenEnded;
     public bool ShowSleepTimer => IsPlaying;
+    public bool ShowTvOnline => IsTvOnline == true;
+    public bool ShowTvOffline => IsTvOnline == false;
+    public bool ShowTvStatusUnknown => IsTvOnline is null;
+    public string TvOnlineToolTip => IsTvOnline switch
+    {
+        true => "TV online",
+        false => "TV offline",
+        _ => "Memeriksa koneksi TV…"
+    };
+
+    public SmartTvTestRequest ToTestRequest() => new()
+    {
+        IpAddress = _ipAddress,
+        MacAddress = _macAddress,
+        WsPort = _wsPort,
+        Token = _token
+    };
 
     public void Apply(UnitCardItem item)
     {
         SmartTvId = item.SmartTvId;
         SessionId = item.SessionId;
+        _ipAddress = item.IpAddress;
+        _macAddress = item.MacAddress;
+        _wsPort = item.WsPort;
+        _token = item.Token;
         TvName = item.TvName;
         StatusLabel = item.StatusLabel;
         IsPlaying = item.IsPlaying;
         IsOpenEnded = item.IsOpenEnded;
+        IsTvOnline = null;
         CustomerDisplay = string.IsNullOrWhiteSpace(item.CustomerName) ? "-" : item.CustomerName;
         PackageDisplay = string.IsNullOrWhiteSpace(item.PackageName) ? "-" : item.PackageName;
         FixedAmount = item.Amount;
@@ -97,6 +132,8 @@ public partial class UnitCardViewModel : ViewModelBase
         RefreshTimer(DateTime.UtcNow);
         NotifyPlayingLayout();
     }
+
+    public void SetTvOnline(bool isOnline) => IsTvOnline = isOnline;
 
     /// <summary>
     /// Hentikan tampilan sesi di kartu segera (sebelum power-off TV selesai).
