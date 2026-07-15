@@ -15,8 +15,11 @@ def tv_controller(tmp_path, monkeypatch):
 
 @pytest.fixture
 def flask_client():
+    from tv_notification_store import clear_all
     from tv_service import app
 
+    clear_all()
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
+    clear_all()

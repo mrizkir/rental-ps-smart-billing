@@ -52,6 +52,15 @@ public interface ITvApiClient
         string? token,
         SleepTimerProfile profile,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Set overlay warning for Tizen app (polled via GET /api/tv-notification).
+    /// </summary>
+    Task<TvConnectionTestResult> SetTvNotificationAsync(
+        int tvId,
+        bool showWarning,
+        string message,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class TvApiClient : ITvApiClient, IDisposable
@@ -166,6 +175,39 @@ public sealed class TvApiClient : ITvApiClient, IDisposable
                 ["confirm_keys"] = string.Join(",", profile.ConfirmKeys)
             },
             cancellationToken);
+
+    public async Task<TvConnectionTestResult> SetTvNotificationAsync(
+        int tvId,
+        bool showWarning,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        var health = await EnsureHealthyAsync(cancellationToken);
+        if (!health.Success)
+            return health;
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["tv_id"] = tvId,
+            ["show_warning"] = showWarning,
+            ["message"] = message
+        };
+
+        try
+        {
+            using var response = await _httpClient.PostAsJsonAsync(
+                "api/tv-notification",
+                payload,
+                cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return ParseResult(body);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("TV API api/tv-notification failed", ex);
+            return TvConnectionTestResult.Failed($"Gagal set notifikasi TV: {ex.Message}");
+        }
+    }
 
     private async Task<TvConnectionTestResult> PostDeviceActionAsync(
         string path,

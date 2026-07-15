@@ -2,7 +2,9 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-FLASK_HOST = "127.0.0.1"
+# 0.0.0.0 supaya Tizen app di TV (LAN) bisa reach /api/tv-notification.
+# App desktop .NET tetap bisa pakai http://127.0.0.1:5001
+FLASK_HOST = "0.0.0.0"
 FLASK_PORT = 5001
 
 SPLASH_HOST = "0.0.0.0"

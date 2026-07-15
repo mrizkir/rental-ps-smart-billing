@@ -12,6 +12,7 @@ from config import (
 from ps4_controller import PS4Controller
 from splash_server import SplashServer
 from tv_controller import SamsungTVController
+from tv_notification_store import consume_notification, set_notification
 
 logging.basicConfig(
     level=logging.INFO,
@@ -187,6 +188,40 @@ def ps4_power_on():
     logger.info("PS4 power-on requested")
     result = ps4_controller.power_on(config["ps4_mac"])
     return jsonify(result), 200 if result["success"] else 500
+
+
+@app.route("/api/tv-notification", methods=["GET"])
+def tv_notification_get():
+    """Polled by Tizen overlay app. Consumes warning so banner shows once."""
+    tv_id = request.args.get("tv_id")
+    payload = consume_notification(tv_id)
+    logger.info(
+        "TV notification GET tv_id=%s show_warning=%s",
+        tv_id or "default",
+        payload["show_warning"],
+    )
+    return jsonify(payload)
+
+
+@app.route("/api/tv-notification", methods=["POST"])
+def tv_notification_post():
+    """Set by desktop billing app when a session is about to end."""
+    data = request.get_json(silent=True) or {}
+    tv_id = data.get("tv_id")
+    show_warning = bool(data.get("show_warning", False))
+    message = data.get("message") or ""
+
+    if show_warning and not str(message).strip():
+        message = "Waktu hampir habis"
+
+    payload = set_notification(tv_id, show_warning, str(message))
+    logger.info(
+        "TV notification POST tv_id=%s show_warning=%s message=%s",
+        tv_id if tv_id is not None else "default",
+        payload["show_warning"],
+        payload["message"],
+    )
+    return jsonify({"success": True, **payload})
 
 
 @app.route("/splash/show", methods=["POST"])

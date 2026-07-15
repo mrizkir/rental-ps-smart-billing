@@ -226,7 +226,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _sleepWarnedSessionIds.Add(sessionId);
                 try
                 {
-                    var result = await _billingService.ShowSleepTimerAsync(unit.SmartTvId);
+                    var overlayMessage = $"{warnMinutes} menit lagi";
+                    var result = await _billingService.ShowSleepTimerAsync(
+                        unit.SmartTvId,
+                        overlayMessage);
                     StatusMessage = result.Success
                         ? (result.WarningMessage ?? $"Sleep Timer otomatis: {unit.TvName}")
                         : (result.ErrorMessage ?? $"Sleep Timer gagal: {unit.TvName}");

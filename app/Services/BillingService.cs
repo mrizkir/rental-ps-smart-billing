@@ -33,6 +33,7 @@ public interface IBillingService
         CancellationToken cancellationToken = default);
     Task<BillingResult> ShowSleepTimerAsync(
         int smartTvId,
+        string? overlayMessage = null,
         CancellationToken cancellationToken = default);
     Task AutoEndExpiredAsync(CancellationToken cancellationToken = default);
     Task<RevenueReportResult> GetRevenueReportAsync(
@@ -332,11 +333,32 @@ public sealed class BillingService : IBillingService
 
     public async Task<BillingResult> ShowSleepTimerAsync(
         int smartTvId,
+        string? overlayMessage = null,
         CancellationToken cancellationToken = default)
     {
         var tv = await _smartTvs.GetByIdAsync(smartTvId, cancellationToken);
         if (tv is null || !tv.IsActive)
             return BillingResult.Failed("Smart TV tidak ditemukan atau nonaktif.");
+
+        var message = string.IsNullOrWhiteSpace(overlayMessage)
+            ? $"{BillingCalculator.SleepTimerWarnMinutesBeforeEnd} menit lagi"
+            : overlayMessage.Trim();
+
+        // Overlay Tizen (best-effort) — independent dari Sleep Timer remote
+        try
+        {
+            var notify = await _tvApi.SetTvNotificationAsync(
+                smartTvId,
+                showWarning: true,
+                message,
+                cancellationToken);
+            if (!notify.Success)
+                AppLog.Warn($"TV overlay notification failed for id={smartTvId}: {notify.Message}");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"TV overlay notification failed for id={smartTvId}", ex);
+        }
 
         try
         {

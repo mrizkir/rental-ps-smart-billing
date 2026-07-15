@@ -232,3 +232,66 @@ class TestDeviceConfig:
 
         assert response.status_code == 400
         assert "ps4_mac" in response.get_json()["message"]
+
+
+class TestTvNotificationEndpoint:
+    def test_get_empty_returns_no_warning(self, flask_client):
+        response = flask_client.get("/api/tv-notification?tv_id=1")
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["show_warning"] is False
+        assert data["message"] == ""
+
+    def test_post_then_get_consumes_warning(self, flask_client):
+        post = flask_client.post(
+            "/api/tv-notification",
+            json={"tv_id": 1, "show_warning": True, "message": "5 menit lagi"},
+        )
+        assert post.status_code == 200
+        assert post.get_json()["success"] is True
+
+        first = flask_client.get("/api/tv-notification?tv_id=1")
+        assert first.status_code == 200
+        data = first.get_json()
+        assert data["show_warning"] is True
+        assert data["message"] == "5 menit lagi"
+
+        second = flask_client.get("/api/tv-notification?tv_id=1")
+        assert second.get_json()["show_warning"] is False
+
+    def test_notifications_are_per_tv_id(self, flask_client):
+        flask_client.post(
+            "/api/tv-notification",
+            json={"tv_id": 1, "show_warning": True, "message": "TV1"},
+        )
+        flask_client.post(
+            "/api/tv-notification",
+            json={"tv_id": 2, "show_warning": True, "message": "TV2"},
+        )
+
+        assert flask_client.get("/api/tv-notification?tv_id=1").get_json()["message"] == "TV1"
+        assert flask_client.get("/api/tv-notification?tv_id=2").get_json()["message"] == "TV2"
+
+    def test_post_clear_warning(self, flask_client):
+        flask_client.post(
+            "/api/tv-notification",
+            json={"tv_id": 1, "show_warning": True, "message": "5 menit lagi"},
+        )
+        flask_client.post(
+            "/api/tv-notification",
+            json={"tv_id": 1, "show_warning": False},
+        )
+
+        data = flask_client.get("/api/tv-notification?tv_id=1").get_json()
+        assert data["show_warning"] is False
+
+    def test_post_default_message_when_empty(self, flask_client):
+        flask_client.post(
+            "/api/tv-notification",
+            json={"tv_id": 1, "show_warning": True, "message": ""},
+        )
+
+        data = flask_client.get("/api/tv-notification?tv_id=1").get_json()
+        assert data["show_warning"] is True
+        assert data["message"] == "Waktu hampir habis"
