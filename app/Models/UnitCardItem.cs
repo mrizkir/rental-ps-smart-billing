@@ -14,6 +14,7 @@ public sealed class UnitCardItem
     public string? PackageName { get; init; }
     public DateTime? StartedAt { get; init; }
     public DateTime? EndsAt { get; init; }
+    public DateTime? OpenEndedFrom { get; init; }
     public decimal Amount { get; init; }
     public decimal PackagePrice { get; init; }
     public string BillingMode { get; init; } = BillingModes.Fixed;

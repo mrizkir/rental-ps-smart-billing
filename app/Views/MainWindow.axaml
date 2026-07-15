@@ -198,6 +198,24 @@
                                                     Background="#1565C0"
                                                     Foreground="White" />
                                             <Button Grid.Column="1"
+                                                    Content="FREE PLAY"
+                                                    Command="{Binding ConvertToFreePlayCommand}"
+                                                    Height="34"
+                                                    FontSize="11"
+                                                    Background="#00838F"
+                                                    Foreground="White" />
+                                        </Grid>
+
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8"
+                                              IsVisible="{Binding ShowFixedPlayingActions}">
+                                            <Button Grid.Column="0"
+                                                    Content="SLEEP TIMER"
+                                                    Command="{Binding SleepTimerCommand}"
+                                                    Height="34"
+                                                    FontSize="11"
+                                                    Background="#6A1B9A"
+                                                    Foreground="White" />
+                                            <Button Grid.Column="1"
                                                     Content="BAYAR"
                                                     Command="{Binding PayCommand}"
                                                     Height="34"
@@ -224,14 +242,6 @@
                                                     Background="#C62828"
                                                     Foreground="White" />
                                         </Grid>
-
-                                        <Button Content="SLEEP TIMER"
-                                                Command="{Binding SleepTimerCommand}"
-                                                Height="34"
-                                                FontSize="11"
-                                                Background="#6A1B9A"
-                                                Foreground="White"
-                                                IsVisible="{Binding ShowFixedPlayingActions}" />
 
                                         <Button Content="START"
                                                 Command="{Binding StartCommand}"

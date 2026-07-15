@@ -9,6 +9,7 @@ public partial class UnitCardViewModel : ViewModelBase
 {
     private readonly Func<UnitCardViewModel, Task> _startAsync;
     private readonly Func<UnitCardViewModel, Task> _extendAsync;
+    private readonly Func<UnitCardViewModel, Task> _convertToFreePlayAsync;
     private readonly Func<UnitCardViewModel, Task> _payAsync;
     private readonly Func<UnitCardViewModel, Task> _sleepTimerAsync;
 
@@ -18,11 +19,13 @@ public partial class UnitCardViewModel : ViewModelBase
         bool canEnd,
         Func<UnitCardViewModel, Task> startAsync,
         Func<UnitCardViewModel, Task> extendAsync,
+        Func<UnitCardViewModel, Task> convertToFreePlayAsync,
         Func<UnitCardViewModel, Task> payAsync,
         Func<UnitCardViewModel, Task> sleepTimerAsync)
     {
         _startAsync = startAsync;
         _extendAsync = extendAsync;
+        _convertToFreePlayAsync = convertToFreePlayAsync;
         _payAsync = payAsync;
         _sleepTimerAsync = sleepTimerAsync;
         CanStart = canStart;
@@ -82,12 +85,16 @@ public partial class UnitCardViewModel : ViewModelBase
     private DateTime? _startedAt;
 
     [ObservableProperty]
+    private DateTime? _openEndedFrom;
+
+    [ObservableProperty]
     private decimal _packagePrice;
 
     [ObservableProperty]
     private decimal _fixedAmount;
 
     public bool CanExtend => IsPlaying && !IsOpenEnded;
+    public bool CanConvertToFreePlay => IsPlaying && !IsOpenEnded;
     public bool ShowOpenEndedPay => IsPlaying && IsOpenEnded;
     public bool ShowFixedPlayingActions => IsPlaying && !IsOpenEnded;
     public bool ShowSleepTimer => IsPlaying;
@@ -128,6 +135,7 @@ public partial class UnitCardViewModel : ViewModelBase
         PackagePrice = item.PackagePrice;
         StartedAt = item.StartedAt;
         EndsAt = item.EndsAt;
+        OpenEndedFrom = item.OpenEndedFrom;
         StartedAtDisplay = FormatStartedAt(item.StartedAt);
         RefreshTimer(DateTime.UtcNow);
         NotifyPlayingLayout();
@@ -145,6 +153,7 @@ public partial class UnitCardViewModel : ViewModelBase
         IsOpenEnded = false;
         StartedAt = null;
         EndsAt = null;
+        OpenEndedFrom = null;
         CustomerDisplay = "-";
         PackageDisplay = "-";
         StartedAtDisplay = "-";
@@ -179,9 +188,10 @@ public partial class UnitCardViewModel : ViewModelBase
                 elapsed = TimeSpan.Zero;
 
             TimerDisplay = elapsed.ToString(@"hh\:mm\:ss");
-            var amount = BillingCalculator.CalculateOpenEndedAmount(
-                StartedAt.Value, utcNow, PackagePrice);
-            AmountDisplay = $"Rp {amount:N0}";
+            var billFrom = OpenEndedFrom ?? StartedAt.Value;
+            var openEndedPart = BillingCalculator.CalculateOpenEndedAmount(
+                billFrom, utcNow, PackagePrice);
+            AmountDisplay = $"Rp {(FixedAmount + openEndedPart):N0}";
             return;
         }
 
@@ -224,6 +234,9 @@ public partial class UnitCardViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanExecuteExtend))]
     private Task ExtendAsync() => _extendAsync(this);
 
+    [RelayCommand(CanExecute = nameof(CanExecuteConvertToFreePlay))]
+    private Task ConvertToFreePlayAsync() => _convertToFreePlayAsync(this);
+
     [RelayCommand(CanExecute = nameof(CanExecutePlayingAction))]
     private Task PayAsync() => _payAsync(this);
 
@@ -234,12 +247,15 @@ public partial class UnitCardViewModel : ViewModelBase
 
     private bool CanExecuteExtend() => CanEnd && CanExtend;
 
+    private bool CanExecuteConvertToFreePlay() => CanEnd && CanConvertToFreePlay;
+
     private bool CanExecutePlayingAction() => CanEnd && IsPlaying;
 
     partial void OnIsPlayingChanged(bool value)
     {
         StartCommand.NotifyCanExecuteChanged();
         ExtendCommand.NotifyCanExecuteChanged();
+        ConvertToFreePlayCommand.NotifyCanExecuteChanged();
         PayCommand.NotifyCanExecuteChanged();
         SleepTimerCommand.NotifyCanExecuteChanged();
         NotifyPlayingLayout();
@@ -248,12 +264,14 @@ public partial class UnitCardViewModel : ViewModelBase
     partial void OnIsOpenEndedChanged(bool value)
     {
         ExtendCommand.NotifyCanExecuteChanged();
+        ConvertToFreePlayCommand.NotifyCanExecuteChanged();
         NotifyPlayingLayout();
     }
 
     private void NotifyPlayingLayout()
     {
         OnPropertyChanged(nameof(CanExtend));
+        OnPropertyChanged(nameof(CanConvertToFreePlay));
         OnPropertyChanged(nameof(ShowOpenEndedPay));
         OnPropertyChanged(nameof(ShowFixedPlayingActions));
         OnPropertyChanged(nameof(ShowSleepTimer));

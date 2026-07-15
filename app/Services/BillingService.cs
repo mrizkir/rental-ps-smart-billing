@@ -8,6 +8,7 @@ public interface IBillingService
     Task<IReadOnlyList<UnitCardItem>> GetDashboardAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BillingPackage>> GetPackagesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BillingPackage>> GetFixedPackagesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<BillingPackage>> GetOpenEndedPackagesAsync(CancellationToken cancellationToken = default);
     Task<BillingResult> StartSessionAsync(
         int smartTvId,
         int packageId,
@@ -22,6 +23,10 @@ public interface IBillingService
         int sessionId,
         int minutes,
         decimal price,
+        CancellationToken cancellationToken = default);
+    Task<BillingResult> ConvertToFreePlayAsync(
+        int sessionId,
+        int freePlayPackageId,
         CancellationToken cancellationToken = default);
     Task<BillingResult> EndSessionAsync(
         int sessionId,
@@ -68,6 +73,12 @@ public sealed class BillingService : IBillingService
     {
         var packages = await _packages.GetActiveAsync(cancellationToken);
         return packages.Where(p => !p.IsOpenEnded).ToList();
+    }
+
+    public async Task<IReadOnlyList<BillingPackage>> GetOpenEndedPackagesAsync(CancellationToken cancellationToken = default)
+    {
+        var packages = await _packages.GetActiveAsync(cancellationToken);
+        return packages.Where(p => p.IsOpenEnded).ToList();
     }
 
     public async Task<BillingResult> StartSessionAsync(
@@ -223,6 +234,50 @@ public sealed class BillingService : IBillingService
         return BillingResult.Succeeded(warning, newAmount);
     }
 
+    public async Task<BillingResult> ConvertToFreePlayAsync(
+        int sessionId,
+        int freePlayPackageId,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await _sessions.GetByIdAsync(sessionId, cancellationToken);
+        if (session is null || session.Status != "Active")
+            return BillingResult.Failed("Sesi aktif tidak ditemukan.");
+
+        if (session.IsOpenEnded || session.EndsAt is null)
+            return BillingResult.Failed("Sesi sudah Free Play.");
+
+        var package = await _packages.GetByIdAsync(freePlayPackageId, cancellationToken);
+        if (package is null || !package.IsActive || !package.IsOpenEnded)
+            return BillingResult.Failed("Paket Free Play tidak valid.");
+
+        var openEndedFrom = DateTime.UtcNow;
+        await _sessions.ConvertToFreePlayAsync(sessionId, package.Id, openEndedFrom, cancellationToken);
+
+        var prepaid = session.Amount ?? 0;
+        string? warning = null;
+        var tv = await _smartTvs.GetByIdAsync(session.SmartTvId, cancellationToken);
+        if (tv is not null)
+        {
+            var splash = await _tvApi.ShowSplashAsync(
+                tv.IpAddress,
+                tv.MacAddress,
+                tv.WsPort,
+                tv.Token,
+                tv.Name,
+                package.Name,
+                session.CustomerName ?? "Guest",
+                cancellationToken);
+            await PersistTokenAsync(tv.Id, tv.Token, splash, cancellationToken);
+
+            if (!splash.Success)
+                warning = $"Diubah ke Free Play, tetapi splash gagal: {splash.Message}";
+        }
+
+        AppLog.Info(
+            $"Session converted to Free Play: id={sessionId}, package={package.Name}, prepaid={prepaid}, openEndedFrom={openEndedFrom:O}");
+        return BillingResult.Succeeded(warning, prepaid);
+    }
+
     public async Task<BillingResult> EndSessionAsync(
         int sessionId,
         CancellationToken cancellationToken = default)
@@ -235,11 +290,14 @@ public sealed class BillingService : IBillingService
         decimal amount;
         if (session.IsOpenEnded)
         {
+            var prepaid = session.Amount ?? 0;
             var rate = session.PackagePrice ?? 0;
-            amount = BillingCalculator.CalculateOpenEndedAmount(session.StartedAt, endedAt, rate);
-            var minutes = BillingCalculator.BillableOpenEndedMinutes(session.StartedAt, endedAt);
+            var from = session.OpenEndedBillingFrom;
+            var openEndedAmount = BillingCalculator.CalculateOpenEndedAmount(from, endedAt, rate);
+            amount = prepaid + openEndedAmount;
+            var minutes = BillingCalculator.BillableOpenEndedMinutes(from, endedAt);
             AppLog.Info(
-                $"Open-ended session billed: id={sessionId}, minutes={minutes} (grace={BillingCalculator.FreePlayGraceMinutes}), amount={amount}");
+                $"Open-ended session billed: id={sessionId}, prepaid={prepaid}, minutes={minutes} (grace={BillingCalculator.FreePlayGraceMinutes}), openEnded={openEndedAmount}, total={amount}");
         }
         else
         {

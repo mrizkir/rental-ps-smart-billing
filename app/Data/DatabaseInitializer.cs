@@ -338,6 +338,12 @@ public sealed class DatabaseInitializer
             ALTER TABLE RentalSessions ALTER COLUMN EndsAt DATETIME2 NULL;
         END
 
+        -- Titik mulai tagihan Free Play (null = dari StartedAt; diisi saat convert Fixed→Free Play)
+        IF COL_LENGTH('dbo.RentalSessions', 'OpenEndedFrom') IS NULL
+        BEGIN
+            ALTER TABLE RentalSessions ADD OpenEndedFrom DATETIME2 NULL;
+        END
+
         IF NOT EXISTS (
             SELECT 1 FROM sys.indexes
             WHERE name = 'UX_RentalSessions_ActiveTv' AND object_id = OBJECT_ID('dbo.RentalSessions'))

@@ -23,6 +23,11 @@ public interface IRentalSessionRepository
         DateTime newEndsAt,
         decimal newAmount,
         CancellationToken cancellationToken = default);
+    Task ConvertToFreePlayAsync(
+        int sessionId,
+        int freePlayPackageId,
+        DateTime openEndedFrom,
+        CancellationToken cancellationToken = default);
     Task CompleteAsync(
         int sessionId,
         DateTime endedAt,
@@ -64,7 +69,8 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
                 s.EndsAt,
                 ISNULL(s.Amount, 0),
                 ISNULL(p.Price, 0),
-                ISNULL(p.BillingMode, 'Fixed')
+                ISNULL(p.BillingMode, 'Fixed'),
+                s.OpenEndedFrom
             FROM SmartTvs t
             LEFT JOIN RentalSessions s
                 ON s.SmartTvId = t.Id AND s.Status = 'Active'
@@ -93,7 +99,8 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
                 EndsAt = reader.IsDBNull(10) ? null : reader.GetDateTime(10),
                 Amount = reader.GetDecimal(11),
                 PackagePrice = reader.GetDecimal(12),
-                BillingMode = reader.GetString(13)
+                BillingMode = reader.GetString(13),
+                OpenEndedFrom = reader.IsDBNull(14) ? null : reader.GetDateTime(14)
             });
         }
 
@@ -110,7 +117,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
             SELECT
                 s.Id, s.SmartTvId, s.PackageId, s.CustomerName,
                 s.StartedAt, s.EndsAt, s.EndedAt, s.Status, s.Amount, s.StartedByUserId,
-                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed')
+                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed'), s.OpenEndedFrom
             FROM RentalSessions s
             LEFT JOIN BillingPackages p ON p.Id = s.PackageId
             WHERE s.SmartTvId = @SmartTvId AND s.Status = 'Active'
@@ -131,7 +138,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
             SELECT
                 s.Id, s.SmartTvId, s.PackageId, s.CustomerName,
                 s.StartedAt, s.EndsAt, s.EndedAt, s.Status, s.Amount, s.StartedByUserId,
-                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed')
+                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed'), s.OpenEndedFrom
             FROM RentalSessions s
             LEFT JOIN BillingPackages p ON p.Id = s.PackageId
             WHERE s.Id = @Id
@@ -152,7 +159,7 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
             SELECT
                 s.Id, s.SmartTvId, s.PackageId, s.CustomerName,
                 s.StartedAt, s.EndsAt, s.EndedAt, s.Status, s.Amount, s.StartedByUserId,
-                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed')
+                p.Name, p.Price, ISNULL(p.BillingMode, 'Fixed'), s.OpenEndedFrom
             FROM RentalSessions s
             LEFT JOIN BillingPackages p ON p.Id = s.PackageId
             WHERE s.Status = 'Active'
@@ -227,6 +234,36 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
         var rows = await command.ExecuteNonQueryAsync(cancellationToken);
         if (rows == 0)
             throw new InvalidOperationException("Sesi aktif tidak ditemukan atau Free Play tidak bisa ditambah waktu.");
+    }
+
+    public async Task ConvertToFreePlayAsync(
+        int sessionId,
+        int freePlayPackageId,
+        DateTime openEndedFrom,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = _connectionFactory.Create();
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new SqlCommand(
+            """
+            UPDATE RentalSessions
+            SET PackageId = @PackageId,
+                EndsAt = NULL,
+                OpenEndedFrom = @OpenEndedFrom,
+                UpdatedAt = SYSUTCDATETIME()
+            WHERE Id = @Id
+              AND Status = 'Active'
+              AND EndsAt IS NOT NULL
+            """,
+            connection);
+        command.Parameters.AddWithValue("@Id", sessionId);
+        command.Parameters.AddWithValue("@PackageId", freePlayPackageId);
+        command.Parameters.AddWithValue("@OpenEndedFrom", openEndedFrom);
+
+        var rows = await command.ExecuteNonQueryAsync(cancellationToken);
+        if (rows == 0)
+            throw new InvalidOperationException("Sesi paket tetap aktif tidak ditemukan.");
     }
 
     public async Task CompleteAsync(
@@ -334,6 +371,9 @@ public sealed class RentalSessionRepository : IRentalSessionRepository
         PackagePrice = reader.IsDBNull(11) ? null : reader.GetDecimal(11),
         BillingMode = reader.FieldCount > 12 && !reader.IsDBNull(12)
             ? reader.GetString(12)
-            : BillingModes.Fixed
+            : BillingModes.Fixed,
+        OpenEndedFrom = reader.FieldCount > 13 && !reader.IsDBNull(13)
+            ? reader.GetDateTime(13)
+            : null
     };
 }

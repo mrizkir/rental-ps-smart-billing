@@ -98,6 +98,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     CanEndSession,
                     StartUnitAsync,
                     ExtendUnitAsync,
+                    ConvertToFreePlayUnitAsync,
                     PayUnitAsync,
                     SleepTimerUnitAsync));
             }
@@ -350,6 +351,81 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             AppLog.Error("Extend session failed", ex);
             StatusMessage = "Gagal menambah waktu.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task ConvertToFreePlayUnitAsync(UnitCardViewModel unit)
+    {
+        if (_ownerWindow is null || !CanEndSession || unit.SessionId is null)
+            return;
+
+        if (unit.IsOpenEnded)
+        {
+            StatusMessage = "Sesi sudah Free Play.";
+            return;
+        }
+
+        try
+        {
+            var packages = await _billingService.GetOpenEndedPackagesAsync();
+            if (packages.Count == 0)
+            {
+                StatusMessage = "Belum ada paket Free Play aktif. Tambah dulu di menu Paket.";
+                return;
+            }
+
+            BillingPackage? selectedPackage;
+            if (packages.Count == 1)
+            {
+                var only = packages[0];
+                var confirmed = await DialogHelper.ConfirmAsync(
+                    _ownerWindow,
+                    "Ubah ke Free Play",
+                    $"Ubah sesi {unit.TvName} ke {only.DisplayLabel}?\n\n" +
+                    $"Biaya paket tetap ({unit.AmountDisplay}) tetap ditagih.\n" +
+                    "Free Play dihitung mulai sekarang. TV tetap menyala.");
+                if (!confirmed)
+                    return;
+                selectedPackage = only;
+            }
+            else
+            {
+                var dialog = new StartSessionWindow();
+                var vm = new StartSessionViewModel(
+                    unit.TvName,
+                    packages,
+                    "Ubah ke Free Play",
+                    _ => dialog.Close())
+                {
+                    ShowCustomerField = false
+                };
+                dialog.DataContext = vm;
+                await dialog.ShowDialog(_ownerWindow);
+
+                if (!vm.Confirmed || vm.ResultPackage is null)
+                    return;
+                selectedPackage = vm.ResultPackage;
+            }
+
+            IsBusy = true;
+            var result = await _billingService.ConvertToFreePlayAsync(
+                unit.SessionId.Value,
+                selectedPackage.Id);
+
+            StatusMessage = result.Success
+                ? (result.WarningMessage ?? $"Diubah ke Free Play: {unit.TvName}")
+                : (result.ErrorMessage ?? "Gagal ubah ke Free Play.");
+
+            await LoadDashboardAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Convert to Free Play failed", ex);
+            StatusMessage = "Gagal mengubah ke Free Play.";
         }
         finally
         {
