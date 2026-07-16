@@ -8,14 +8,9 @@ public static class BillingCalculator
     public static int FreePlayGraceMinutes { get; set; } = 5;
 
     /// <summary>
-    /// Berapa menit sebelum EndsAt otomatis kirim Sleep Timer. 0 = nonaktif.
+    /// Berapa menit sebelum EndsAt otomatis kirim overlay peringatan ke Tizen. 0 = nonaktif.
     /// </summary>
-    public static int SleepTimerWarnMinutesBeforeEnd { get; set; } = 5;
-
-    /// <summary>
-    /// Durasi Sleep Timer yang dipilih di TV (biasanya 30/60/90…).
-    /// </summary>
-    public static int SleepTimerMinutes { get; set; } = 30;
+    public static int SessionWarnMinutesBeforeEnd { get; set; } = 5;
 
     /// <summary>
     /// Menit tagihan dengan pembulatan matematika standar (≥ 0.5 naik), tanpa grace.

@@ -31,7 +31,7 @@ public interface IBillingService
     Task<BillingResult> EndSessionAsync(
         int sessionId,
         CancellationToken cancellationToken = default);
-    Task<BillingResult> ShowSleepTimerAsync(
+    Task<BillingResult> ShowSessionEndWarningAsync(
         int smartTvId,
         string? overlayMessage = null,
         CancellationToken cancellationToken = default);
@@ -47,20 +47,17 @@ public sealed class BillingService : IBillingService
     private readonly IRentalSessionRepository _sessions;
     private readonly IBillingPackageRepository _packages;
     private readonly ISmartTvRepository _smartTvs;
-    private readonly ITvModelService _tvModels;
     private readonly ITvApiClient _tvApi;
 
     public BillingService(
         IRentalSessionRepository sessions,
         IBillingPackageRepository packages,
         ISmartTvRepository smartTvs,
-        ITvModelService tvModels,
         ITvApiClient tvApi)
     {
         _sessions = sessions;
         _packages = packages;
         _smartTvs = smartTvs;
-        _tvModels = tvModels;
         _tvApi = tvApi;
     }
 
@@ -331,7 +328,7 @@ public sealed class BillingService : IBillingService
         return BillingResult.Succeeded(warning, amount);
     }
 
-    public async Task<BillingResult> ShowSleepTimerAsync(
+    public async Task<BillingResult> ShowSessionEndWarningAsync(
         int smartTvId,
         string? overlayMessage = null,
         CancellationToken cancellationToken = default)
@@ -341,10 +338,9 @@ public sealed class BillingService : IBillingService
             return BillingResult.Failed("Smart TV tidak ditemukan atau nonaktif.");
 
         var message = string.IsNullOrWhiteSpace(overlayMessage)
-            ? $"{BillingCalculator.SleepTimerWarnMinutesBeforeEnd} menit lagi"
+            ? $"{BillingCalculator.SessionWarnMinutesBeforeEnd} menit lagi"
             : overlayMessage.Trim();
 
-        // Overlay Tizen (best-effort) — independent dari Sleep Timer remote
         try
         {
             var notify = await _tvApi.SetTvNotificationAsync(
@@ -353,38 +349,15 @@ public sealed class BillingService : IBillingService
                 message,
                 cancellationToken);
             if (!notify.Success)
-                AppLog.Warn($"TV overlay notification failed for id={smartTvId}: {notify.Message}");
+                return BillingResult.Failed(notify.Message);
+
+            AppLog.Info($"Session end warning sent: TV={tv.Name}, message={message}");
+            return BillingResult.Succeeded($"Peringatan dikirim ke overlay {tv.Name}.");
         }
         catch (Exception ex)
         {
-            AppLog.Error($"TV overlay notification failed for id={smartTvId}", ex);
-        }
-
-        try
-        {
-            var profile = await _tvModels.ResolveSleepProfileForSmartTvAsync(smartTvId, cancellationToken);
-            var result = await _tvApi.SetSleepTimerAsync(
-                tv.IpAddress,
-                tv.MacAddress,
-                tv.WsPort,
-                tv.Token,
-                profile,
-                cancellationToken);
-            await PersistTokenAsync(tv.Id, tv.Token, result, cancellationToken);
-
-            if (!result.Success)
-                return BillingResult.Failed(result.Message);
-
-            var modelLabel = profile.ModelCode ?? "default";
-            AppLog.Info(
-                $"Sleep timer set: TV={tv.Name}, model={modelLabel}, mode={profile.Mode}, minutes={profile.Minutes}");
-            return BillingResult.Succeeded(
-                $"Sleep Timer ~{profile.Minutes} menit dikirim ke {tv.Name} ({modelLabel}).");
-        }
-        catch (Exception ex)
-        {
-            AppLog.Error($"Sleep timer failed for TV id={smartTvId}", ex);
-            return BillingResult.Failed("Gagal mengirim Sleep Timer ke TV.");
+            AppLog.Error($"Session end warning failed for TV id={smartTvId}", ex);
+            return BillingResult.Failed("Gagal mengirim peringatan ke TV.");
         }
     }
 

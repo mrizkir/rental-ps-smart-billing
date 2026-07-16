@@ -43,12 +43,11 @@
             <Grid RowDefinitions="Auto,*">
                 <Border Grid.Row="0" Background="#ECEFF1" BorderBrush="#CFD8DC"
                         BorderThickness="0,0,0,1" Padding="12,8">
-                    <Grid ColumnDefinitions="140,*,120,160,100">
+                    <Grid ColumnDefinitions="140,*,160,100">
                         <TextBlock Grid.Column="0" Text="Kode" FontWeight="SemiBold" />
                         <TextBlock Grid.Column="1" Text="Nama" FontWeight="SemiBold" />
                         <TextBlock Grid.Column="2" Text="Merek" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="3" Text="Sleep Timer" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="4" Text="Status" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="Status" FontWeight="SemiBold" />
                     </Grid>
                 </Border>
                 <ListBox Grid.Row="1" ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel}"
@@ -56,12 +55,11 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="models:TvModelListItem">
                             <Border Padding="12,8" BorderBrush="#ECEFF1" BorderThickness="0,0,0,1">
-                                <Grid ColumnDefinitions="140,*,120,160,100">
+                                <Grid ColumnDefinitions="140,*,160,100">
                                     <TextBlock Grid.Column="0" Text="{Binding Code}" />
                                     <TextBlock Grid.Column="1" Text="{Binding Name}" />
                                     <TextBlock Grid.Column="2" Text="{Binding Brand}" />
-                                    <TextBlock Grid.Column="3" Text="{Binding SleepDisplay}" />
-                                    <TextBlock Grid.Column="4" Text="{Binding Status}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding Status}" />
                                 </Grid>
                             </Border>
                         </DataTemplate>

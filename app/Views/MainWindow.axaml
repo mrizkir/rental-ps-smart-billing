@@ -188,6 +188,23 @@
                                     </Border>
 
                                     <StackPanel Grid.Row="4" Spacing="8">
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                            <Button Grid.Column="0"
+                                                    Content="POWER ON"
+                                                    Command="{Binding PowerOnCommand}"
+                                                    Height="34"
+                                                    FontSize="11"
+                                                    Background="#455A64"
+                                                    Foreground="White" />
+                                            <Button Grid.Column="1"
+                                                    Content="POWER OFF"
+                                                    Command="{Binding PowerOffCommand}"
+                                                    Height="34"
+                                                    FontSize="11"
+                                                    Background="#37474F"
+                                                    Foreground="White" />
+                                        </Grid>
+
                                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8"
                                               IsVisible="{Binding ShowFixedPlayingActions}">
                                             <Button Grid.Column="0"
@@ -206,42 +223,23 @@
                                                     Foreground="White" />
                                         </Grid>
 
-                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8"
-                                              IsVisible="{Binding ShowFixedPlayingActions}">
-                                            <Button Grid.Column="0"
-                                                    Content="SLEEP TIMER"
-                                                    Command="{Binding SleepTimerCommand}"
-                                                    Height="34"
-                                                    FontSize="11"
-                                                    Background="#6A1B9A"
-                                                    Foreground="White" />
-                                            <Button Grid.Column="1"
-                                                    Content="BAYAR"
-                                                    Command="{Binding PayCommand}"
-                                                    Height="34"
-                                                    FontSize="11"
-                                                    Background="#C62828"
-                                                    Foreground="White" />
-                                        </Grid>
+                                        <Button Content="BAYAR"
+                                                Command="{Binding PayCommand}"
+                                                Height="34"
+                                                FontSize="11"
+                                                FontWeight="SemiBold"
+                                                Background="#C62828"
+                                                Foreground="White"
+                                                IsVisible="{Binding ShowFixedPlayingActions}" />
 
-                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8"
-                                              IsVisible="{Binding ShowOpenEndedPay}">
-                                            <Button Grid.Column="0"
-                                                    Content="SLEEP TIMER"
-                                                    Command="{Binding SleepTimerCommand}"
-                                                    Height="34"
-                                                    FontSize="11"
-                                                    Background="#6A1B9A"
-                                                    Foreground="White" />
-                                            <Button Grid.Column="1"
-                                                    Content="BAYAR"
-                                                    Command="{Binding PayCommand}"
-                                                    Height="34"
-                                                    FontSize="11"
-                                                    FontWeight="SemiBold"
-                                                    Background="#C62828"
-                                                    Foreground="White" />
-                                        </Grid>
+                                        <Button Content="BAYAR"
+                                                Command="{Binding PayCommand}"
+                                                Height="34"
+                                                FontSize="11"
+                                                FontWeight="SemiBold"
+                                                Background="#C62828"
+                                                Foreground="White"
+                                                IsVisible="{Binding ShowOpenEndedPay}" />
 
                                         <Button Content="START"
                                                 Command="{Binding StartCommand}"

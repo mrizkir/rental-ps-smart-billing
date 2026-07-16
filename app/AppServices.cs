@@ -77,17 +77,11 @@ public static class AppServices
         BillingCalculator.FreePlayGraceMinutes = graceMinutes;
         AppLog.Info($"Free Play grace minutes: {BillingCalculator.FreePlayGraceMinutes}");
 
-        var sleepWarnMinutes = configuration.GetValue("Billing:SleepTimerWarnMinutesBeforeEnd", 5);
-        if (sleepWarnMinutes < 0)
-            sleepWarnMinutes = 0;
-        BillingCalculator.SleepTimerWarnMinutesBeforeEnd = sleepWarnMinutes;
-        AppLog.Info($"Sleep timer auto-warn minutes: {BillingCalculator.SleepTimerWarnMinutesBeforeEnd}");
-
-        var sleepTimerMinutes = configuration.GetValue("Billing:SleepTimerMinutes", 30);
-        if (sleepTimerMinutes < 1)
-            sleepTimerMinutes = 30;
-        BillingCalculator.SleepTimerMinutes = sleepTimerMinutes;
-        AppLog.Info($"Sleep timer TV duration minutes: {BillingCalculator.SleepTimerMinutes}");
+        var sessionWarnMinutes = configuration.GetValue("Billing:SessionWarnMinutesBeforeEnd", 5);
+        if (sessionWarnMinutes < 0)
+            sessionWarnMinutes = 0;
+        BillingCalculator.SessionWarnMinutesBeforeEnd = sessionWarnMinutes;
+        AppLog.Info($"Session end overlay warn minutes: {BillingCalculator.SessionWarnMinutesBeforeEnd}");
 
         Session = new SessionService();
         Auth = new AuthService(userRepository);
@@ -99,7 +93,6 @@ public static class AppServices
             sessionRepository,
             packageRepository,
             smartTvRepository,
-            TvModels,
             tvApiClient);
         IsInitialized = true;
 

@@ -45,14 +45,6 @@ public interface ITvApiClient
         string key,
         CancellationToken cancellationToken = default);
 
-    Task<TvConnectionTestResult> SetSleepTimerAsync(
-        string ipAddress,
-        string macAddress,
-        int wsPort,
-        string? token,
-        SleepTimerProfile profile,
-        CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Set overlay warning for Tizen app (polled via GET /api/tv-notification).
     /// </summary>
@@ -152,28 +144,6 @@ public sealed class TvApiClient : ITvApiClient, IDisposable
             wsPort,
             token,
             new Dictionary<string, object?> { ["key"] = key },
-            cancellationToken);
-
-    public Task<TvConnectionTestResult> SetSleepTimerAsync(
-        string ipAddress,
-        string macAddress,
-        int wsPort,
-        string? token,
-        SleepTimerProfile profile,
-        CancellationToken cancellationToken = default) =>
-        PostDeviceActionAsync(
-            "tv/sleep-timer",
-            ipAddress,
-            macAddress,
-            wsPort,
-            token,
-            new Dictionary<string, object?>
-            {
-                ["minutes"] = profile.Minutes,
-                ["mode"] = profile.Mode,
-                ["key_delay"] = profile.KeyDelaySeconds,
-                ["confirm_keys"] = string.Join(",", profile.ConfirmKeys)
-            },
             cancellationToken);
 
     public async Task<TvConnectionTestResult> SetTvNotificationAsync(

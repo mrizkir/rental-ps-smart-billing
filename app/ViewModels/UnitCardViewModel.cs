@@ -11,25 +11,30 @@ public partial class UnitCardViewModel : ViewModelBase
     private readonly Func<UnitCardViewModel, Task> _extendAsync;
     private readonly Func<UnitCardViewModel, Task> _convertToFreePlayAsync;
     private readonly Func<UnitCardViewModel, Task> _payAsync;
-    private readonly Func<UnitCardViewModel, Task> _sleepTimerAsync;
+    private readonly Func<UnitCardViewModel, Task> _powerOnAsync;
+    private readonly Func<UnitCardViewModel, Task> _powerOffAsync;
 
     public UnitCardViewModel(
         UnitCardItem item,
         bool canStart,
         bool canEnd,
+        bool canControlPower,
         Func<UnitCardViewModel, Task> startAsync,
         Func<UnitCardViewModel, Task> extendAsync,
         Func<UnitCardViewModel, Task> convertToFreePlayAsync,
         Func<UnitCardViewModel, Task> payAsync,
-        Func<UnitCardViewModel, Task> sleepTimerAsync)
+        Func<UnitCardViewModel, Task> powerOnAsync,
+        Func<UnitCardViewModel, Task> powerOffAsync)
     {
         _startAsync = startAsync;
         _extendAsync = extendAsync;
         _convertToFreePlayAsync = convertToFreePlayAsync;
         _payAsync = payAsync;
-        _sleepTimerAsync = sleepTimerAsync;
+        _powerOnAsync = powerOnAsync;
+        _powerOffAsync = powerOffAsync;
         CanStart = canStart;
         CanEnd = canEnd;
+        CanControlPower = canControlPower;
         Apply(item);
     }
 
@@ -37,6 +42,7 @@ public partial class UnitCardViewModel : ViewModelBase
     public int? SessionId { get; private set; }
     public bool CanStart { get; }
     public bool CanEnd { get; }
+    public bool CanControlPower { get; }
 
     private string _ipAddress = string.Empty;
     private string _macAddress = string.Empty;
@@ -97,7 +103,6 @@ public partial class UnitCardViewModel : ViewModelBase
     public bool CanConvertToFreePlay => IsPlaying && !IsOpenEnded;
     public bool ShowOpenEndedPay => IsPlaying && IsOpenEnded;
     public bool ShowFixedPlayingActions => IsPlaying && !IsOpenEnded;
-    public bool ShowSleepTimer => IsPlaying;
     public bool ShowTvOnline => IsTvOnline == true;
     public bool ShowTvOffline => IsTvOnline == false;
     public bool ShowTvStatusUnknown => IsTvOnline is null;
@@ -213,7 +218,7 @@ public partial class UnitCardViewModel : ViewModelBase
     public bool IsExpired(DateTime utcNow) =>
         IsPlaying && !IsOpenEnded && EndsAt is not null && EndsAt.Value <= utcNow;
 
-    public bool NeedsSleepTimerWarn(DateTime utcNow, int warnMinutesBeforeEnd)
+    public bool NeedsSessionEndWarn(DateTime utcNow, int warnMinutesBeforeEnd)
     {
         if (warnMinutesBeforeEnd <= 0 || !IsPlaying || IsOpenEnded || EndsAt is null || SessionId is null)
             return false;
@@ -240,8 +245,11 @@ public partial class UnitCardViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanExecutePlayingAction))]
     private Task PayAsync() => _payAsync(this);
 
-    [RelayCommand(CanExecute = nameof(CanExecutePlayingAction))]
-    private Task SleepTimerAsync() => _sleepTimerAsync(this);
+    [RelayCommand(CanExecute = nameof(CanExecutePower))]
+    private Task PowerOnAsync() => _powerOnAsync(this);
+
+    [RelayCommand(CanExecute = nameof(CanExecutePower))]
+    private Task PowerOffAsync() => _powerOffAsync(this);
 
     private bool CanExecuteStart() => CanStart && !IsPlaying;
 
@@ -251,13 +259,14 @@ public partial class UnitCardViewModel : ViewModelBase
 
     private bool CanExecutePlayingAction() => CanEnd && IsPlaying;
 
+    private bool CanExecutePower() => CanControlPower;
+
     partial void OnIsPlayingChanged(bool value)
     {
         StartCommand.NotifyCanExecuteChanged();
         ExtendCommand.NotifyCanExecuteChanged();
         ConvertToFreePlayCommand.NotifyCanExecuteChanged();
         PayCommand.NotifyCanExecuteChanged();
-        SleepTimerCommand.NotifyCanExecuteChanged();
         NotifyPlayingLayout();
     }
 
@@ -274,6 +283,5 @@ public partial class UnitCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanConvertToFreePlay));
         OnPropertyChanged(nameof(ShowOpenEndedPay));
         OnPropertyChanged(nameof(ShowFixedPlayingActions));
-        OnPropertyChanged(nameof(ShowSleepTimer));
     }
 }

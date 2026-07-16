@@ -4,11 +4,11 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        d:DesignWidth="480" d:DesignHeight="560"
+        d:DesignWidth="480" d:DesignHeight="360"
         x:Class="rental_ps_smart_billing.Views.AddTvModelWindow"
         x:DataType="vm:AddTvModelViewModel"
         Title="Tambah Model TV"
-        Width="480" Height="560"
+        Width="480" Height="360"
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         Background="#ECEFF1">
@@ -27,25 +27,6 @@
             <StackPanel Spacing="4">
                 <TextBlock Text="Merek" FontWeight="Medium" />
                 <TextBox Text="{Binding Brand}" IsEnabled="{Binding !IsBusy}" />
-            </StackPanel>
-            <StackPanel Spacing="4">
-                <TextBlock Text="Mode Sleep Timer" FontWeight="Medium" />
-                <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}"
-                          HorizontalAlignment="Stretch" IsEnabled="{Binding !IsBusy}" />
-            </StackPanel>
-            <StackPanel Spacing="4">
-                <TextBlock Text="Durasi (menit)" FontWeight="Medium" />
-                <TextBox Text="{Binding MinutesText}" IsEnabled="{Binding !IsBusy}" />
-            </StackPanel>
-            <StackPanel Spacing="4">
-                <TextBlock Text="Delay antar tombol (detik)" FontWeight="Medium" />
-                <TextBox Text="{Binding KeyDelayText}" IsEnabled="{Binding !IsBusy}" />
-            </StackPanel>
-            <StackPanel Spacing="4" IsVisible="{Binding ShowConfirmKeys}">
-                <TextBlock Text="Confirm keys (setelah KEY_SLEEP)" FontWeight="Medium" />
-                <TextBox Text="{Binding ConfirmKeysText}"
-                         PlaceholderText="KEY_DOWN,KEY_ENTER"
-                         IsEnabled="{Binding !IsBusy}" />
             </StackPanel>
             <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828" TextWrapping="Wrap"
                        IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />

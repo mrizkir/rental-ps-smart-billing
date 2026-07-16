@@ -185,8 +185,7 @@ Di [`app/appsettings.json`](app/appsettings.json):
 },
 "Billing": {
   "FreePlayGraceMinutes": 5,
-  "SleepTimerWarnMinutesBeforeEnd": 5,
-  "SleepTimerMinutes": 30
+  "SessionWarnMinutesBeforeEnd": 5
 }
 ```
 
@@ -194,18 +193,11 @@ Di [`app/appsettings.json`](app/appsettings.json):
 
 `FreePlayGraceMinutes` = menit awal Free Play yang **tidak ditagih** (default `5`). Override bisa di `appsettings.local.json` atau env `RENTAL_PS_Billing__FreePlayGraceMinutes`.
 
-`SleepTimerWarnMinutesBeforeEnd` = menit sebelum sesi paket tetap berakhir, app otomatis set Sleep Timer di TV (default `5`). Set `0` untuk menonaktifkan auto. Operator juga bisa menekan tombol **SLEEP TIMER** di kartu unit.
-
-`SleepTimerMinutes` = fallback durasi Sleep Timer jika Smart TV belum punya model (default `30`).
+`SessionWarnMinutesBeforeEnd` = menit sebelum sesi paket tetap berakhir, app otomatis kirim overlay peringatan ke Tizen app di TV (default `5`). Set `0` untuk menonaktifkan. Endpoint: `POST /api/tv-notification`.
 
 ### Model TV (multi-rental)
 
-Menu **Smart TV → Daftar Model TV** mengelola profil per model (contoh `43U8000F`):
-- mode Sleep Timer (`menu` / `cycle`)
-- durasi menit
-- urutan tombol setelah `KEY_SLEEP` (`KEY_DOWN,KEY_ENTER`, dll.)
-
-Setiap Smart TV memilih **Model TV**. Saat Sleep Timer dikirim, profil model itulah yang dipakai — cocok untuk toko dengan model TV berbeda. Seed awal: `43U8000F`.
+Menu **Smart TV → Daftar Model TV** mengelola profil per model (kode, nama, merek). Contoh seed: `43U8000F`. Setiap Smart TV memilih **Model TV**.
 
 ### Laporan pendapatan
 

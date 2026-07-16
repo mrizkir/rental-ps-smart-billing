@@ -9,11 +9,6 @@ from samsungtvws import SamsungTVWS
 from wakeonlan import send_magic_packet
 
 from config import (
-    SLEEP_TIMER_CONFIRM_KEYS,
-    SLEEP_TIMER_CYCLE_OPTIONS,
-    SLEEP_TIMER_KEY_DELAY,
-    SLEEP_TIMER_MINUTES,
-    SLEEP_TIMER_MODE,
     TOKENS_DIR,
     TV_WS_PORT,
     WOL_PACKET_COUNT,
@@ -283,74 +278,6 @@ class SamsungTVController:
         except Exception as exc:
             logger.exception("Failed to send key %s to TV %s", key, self.tv_ip)
             return {"success": False, "message": f"Send key failed: {exc}"}
-
-    def set_sleep_timer(
-        self,
-        minutes: Optional[int] = None,
-        *,
-        mode: Optional[str] = None,
-        confirm_keys: Optional[list[str]] = None,
-        key_delay: Optional[float] = None,
-    ) -> dict:
-        """
-        Buka Sleep Timer lalu pilih durasi.
-        Parameter bisa override default global (dari profil model TV).
-        """
-        target = minutes if minutes is not None else SLEEP_TIMER_MINUTES
-        if target < 1:
-            return {"success": False, "message": "Sleep timer minutes must be >= 1"}
-
-        resolved_mode = (mode or SLEEP_TIMER_MODE).strip().lower()
-        if resolved_mode not in ("menu", "cycle"):
-            resolved_mode = "menu"
-
-        delay = max(0.2, float(key_delay if key_delay is not None else SLEEP_TIMER_KEY_DELAY))
-        keys_after_sleep = confirm_keys if confirm_keys else SLEEP_TIMER_CONFIRM_KEYS
-
-        try:
-            tv = self._connect()
-            if resolved_mode == "cycle":
-                presses = self._cycle_presses_for(target)
-                logger.info(
-                    "Sleep timer cycle mode on %s: target=%s → %s× KEY_SLEEP",
-                    self.tv_ip,
-                    target,
-                    presses,
-                )
-                for index in range(presses):
-                    tv.send_key("KEY_SLEEP")
-                    if index < presses - 1:
-                        time.sleep(delay)
-                message = (
-                    f"Sleep timer cycle sent ({presses}× KEY_SLEEP, target ~{target} menit)"
-                )
-            else:
-                keys = ["KEY_SLEEP", *keys_after_sleep]
-                logger.info(
-                    "Sleep timer menu mode on %s: target=%s keys=%s",
-                    self.tv_ip,
-                    target,
-                    keys,
-                )
-                for index, key in enumerate(keys):
-                    tv.send_key(key)
-                    if index < len(keys) - 1:
-                        time.sleep(delay)
-                message = (
-                    f"Sleep timer menu sequence sent (target ~{target} menit): "
-                    + " → ".join(keys)
-                )
-
-            return self._result_with_token(tv, message)
-        except Exception as exc:
-            logger.exception("Failed to set sleep timer on TV %s", self.tv_ip)
-            return {"success": False, "message": f"Set sleep timer failed: {exc}"}
-
-    @staticmethod
-    def _cycle_presses_for(minutes: int) -> int:
-        options = SLEEP_TIMER_CYCLE_OPTIONS or [30, 60, 90, 120, 150, 180]
-        nearest = min(options, key=lambda value: abs(value - minutes))
-        return options.index(nearest) + 1
 
     def open_browser(self, url: str) -> dict:
         try:

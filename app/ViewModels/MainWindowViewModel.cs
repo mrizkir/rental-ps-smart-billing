@@ -18,11 +18,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IBillingPackageService _packageService;
     private readonly IBillingService _billingService;
     private readonly DispatcherTimer _timer;
-    private readonly HashSet<int> _sleepWarnedSessionIds = [];
+    private readonly HashSet<int> _sessionWarnedIds = [];
     private Window? _ownerWindow;
     private bool _isRefreshing;
     private bool _disposed;
-    private bool _isSendingSleepWarn;
+    private bool _isSendingSessionWarn;
     private CancellationTokenSource? _tvStatusCts;
 
     public MainWindowViewModel(
@@ -96,11 +96,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     card,
                     CanStartSession,
                     CanEndSession,
+                    canControlPower: CanStartSession || CanEndSession,
                     StartUnitAsync,
                     ExtendUnitAsync,
                     ConvertToFreePlayUnitAsync,
                     PayUnitAsync,
-                    SleepTimerUnitAsync));
+                    PowerOnUnitAsync,
+                    PowerOffUnitAsync));
             }
 
             StatusMessage = Units.Count == 0
@@ -167,7 +169,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (_isRefreshing || _billingService is null)
             return;
 
-        await TryAutoSleepWarnAsync(now);
+        await TryAutoSessionWarnAsync(now);
 
         var expired = Units.Where(u => u.IsExpired(now) && u.SessionId is not null).ToList();
         if (expired.Count == 0)
@@ -179,7 +181,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             foreach (var unit in expired)
             {
                 if (unit.SessionId is int sessionId)
-                    _sleepWarnedSessionIds.Remove(sessionId);
+                    _sessionWarnedIds.Remove(sessionId);
                 unit.MarkStopped();
             }
 
@@ -192,10 +194,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task TryAutoSleepWarnAsync(DateTime utcNow)
+    private async Task TryAutoSessionWarnAsync(DateTime utcNow)
     {
-        var warnMinutes = BillingCalculator.SleepTimerWarnMinutesBeforeEnd;
-        if (warnMinutes <= 0 || _isSendingSleepWarn || !CanEndSession)
+        var warnMinutes = BillingCalculator.SessionWarnMinutesBeforeEnd;
+        if (warnMinutes <= 0 || _isSendingSessionWarn || !CanEndSession)
             return;
 
         // Reset warn flag if session diperpanjang melewati jendela peringatan.
@@ -205,44 +207,44 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 continue;
 
             if (unit.EndsAt.Value - utcNow > TimeSpan.FromMinutes(warnMinutes))
-                _sleepWarnedSessionIds.Remove(sessionId);
+                _sessionWarnedIds.Remove(sessionId);
         }
 
         var toWarn = Units
             .Where(u => u.SessionId is not null
-                        && u.NeedsSleepTimerWarn(utcNow, warnMinutes)
-                        && !_sleepWarnedSessionIds.Contains(u.SessionId.Value))
+                        && u.NeedsSessionEndWarn(utcNow, warnMinutes)
+                        && !_sessionWarnedIds.Contains(u.SessionId.Value))
             .ToList();
 
         if (toWarn.Count == 0)
             return;
 
-        _isSendingSleepWarn = true;
+        _isSendingSessionWarn = true;
         try
         {
             foreach (var unit in toWarn)
             {
                 var sessionId = unit.SessionId!.Value;
-                _sleepWarnedSessionIds.Add(sessionId);
+                _sessionWarnedIds.Add(sessionId);
                 try
                 {
                     var overlayMessage = $"{warnMinutes} menit lagi";
-                    var result = await _billingService.ShowSleepTimerAsync(
+                    var result = await _billingService.ShowSessionEndWarningAsync(
                         unit.SmartTvId,
                         overlayMessage);
                     StatusMessage = result.Success
-                        ? (result.WarningMessage ?? $"Sleep Timer otomatis: {unit.TvName}")
-                        : (result.ErrorMessage ?? $"Sleep Timer gagal: {unit.TvName}");
+                        ? (result.WarningMessage ?? $"Peringatan dikirim: {unit.TvName}")
+                        : (result.ErrorMessage ?? $"Peringatan gagal: {unit.TvName}");
                 }
                 catch (Exception ex)
                 {
-                    AppLog.Error($"Auto sleep timer failed for TV {unit.TvName}", ex);
+                    AppLog.Error($"Auto session warning failed for TV {unit.TvName}", ex);
                 }
             }
         }
         finally
         {
-            _isSendingSleepWarn = false;
+            _isSendingSessionWarn = false;
         }
     }
 
@@ -436,26 +438,53 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task SleepTimerUnitAsync(UnitCardViewModel unit)
+    private async Task PowerOnUnitAsync(UnitCardViewModel unit)
     {
-        if (!CanEndSession || !unit.IsPlaying)
+        if (_smartTvService is null || !(CanStartSession || CanEndSession))
             return;
 
         try
         {
             IsBusy = true;
-            var result = await _billingService.ShowSleepTimerAsync(unit.SmartTvId);
-            if (unit.SessionId is int sessionId)
-                _sleepWarnedSessionIds.Add(sessionId);
-
+            StatusMessage = $"Menyalakan TV {unit.TvName}…";
+            var result = await _smartTvService.PowerOnAsync(unit.SmartTvId);
+            unit.SetTvOnline(result.Success);
             StatusMessage = result.Success
-                ? (result.WarningMessage ?? $"Sleep Timer dikirim: {unit.TvName}")
-                : (result.ErrorMessage ?? "Gagal mengirim Sleep Timer.");
+                ? $"TV {unit.TvName} dinyalakan."
+                : (result.Message ?? $"Gagal menyalakan {unit.TvName}.");
         }
         catch (Exception ex)
         {
-            AppLog.Error("Manual sleep timer failed", ex);
-            StatusMessage = "Gagal mengirim Sleep Timer.";
+            AppLog.Error($"Power-on failed for TV {unit.TvName}", ex);
+            StatusMessage = $"Gagal menyalakan {unit.TvName}.";
+            unit.SetTvOnline(false);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task PowerOffUnitAsync(UnitCardViewModel unit)
+    {
+        if (_smartTvService is null || !(CanStartSession || CanEndSession))
+            return;
+
+        try
+        {
+            IsBusy = true;
+            StatusMessage = $"Mematikan TV {unit.TvName}…";
+            var result = await _smartTvService.PowerOffAsync(unit.SmartTvId);
+            if (result.Success)
+                unit.SetTvOnline(false);
+            StatusMessage = result.Success
+                ? $"TV {unit.TvName} dimatikan."
+                : (result.Message ?? $"Gagal mematikan {unit.TvName}.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Power-off failed for TV {unit.TvName}", ex);
+            StatusMessage = $"Gagal mematikan {unit.TvName}.";
         }
         finally
         {

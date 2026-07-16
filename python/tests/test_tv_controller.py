@@ -168,34 +168,6 @@ class TestSamsungTVController:
         assert result["success"] is True
         assert "HDMI1" in result["message"]
 
-    @patch("tv_controller.time.sleep", return_value=None)
-    @patch("tv_controller.SamsungTVWS")
-    def test_set_sleep_timer_menu_sequence(self, mock_tv_class, _sleep, tv_controller):
-        mock_tv = MagicMock()
-        mock_tv_class.return_value = mock_tv
-
-        result = tv_controller.set_sleep_timer(30)
-
-        assert result["success"] is True
-        assert [call.args[0] for call in mock_tv.send_key.call_args_list] == [
-            "KEY_SLEEP",
-            "KEY_DOWN",
-            "KEY_ENTER",
-        ]
-
-    @patch("tv_controller.time.sleep", return_value=None)
-    @patch("tv_controller.SLEEP_TIMER_MODE", "cycle")
-    @patch("tv_controller.SamsungTVWS")
-    def test_set_sleep_timer_cycle_presses(self, mock_tv_class, _sleep, tv_controller):
-        mock_tv = MagicMock()
-        mock_tv_class.return_value = mock_tv
-
-        result = tv_controller.set_sleep_timer(30)
-
-        assert result["success"] is True
-        assert mock_tv.send_key.call_count == 1
-        mock_tv.send_key.assert_called_with("KEY_SLEEP")
-
     @patch("tv_controller.SamsungTVWS")
     def test_send_key_success(self, mock_tv_class, tv_controller):
         mock_tv = MagicMock()

@@ -38,6 +38,12 @@ public interface ISmartTvService
     Task<TvConnectionTestResult> TestConnectionAsync(
         int id,
         CancellationToken cancellationToken = default);
+    Task<TvConnectionTestResult> PowerOnAsync(
+        int id,
+        CancellationToken cancellationToken = default);
+    Task<TvConnectionTestResult> PowerOffAsync(
+        int id,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class SmartTvService : ISmartTvService
@@ -192,6 +198,47 @@ public sealed class SmartTvService : ISmartTvService
         {
             await _repository.UpdateTokenAsync(id, result.Token, cancellationToken);
             AppLog.Info($"Smart TV token updated from pairing: {tv.Name}");
+        }
+
+        return result;
+    }
+
+    public Task<TvConnectionTestResult> PowerOnAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        RunPowerActionAsync(id, _tvApiClient.PowerOnAsync, "power-on", cancellationToken);
+
+    public Task<TvConnectionTestResult> PowerOffAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        RunPowerActionAsync(id, _tvApiClient.PowerOffAsync, "power-off", cancellationToken);
+
+    private async Task<TvConnectionTestResult> RunPowerActionAsync(
+        int id,
+        Func<string, string, int, string?, CancellationToken, Task<TvConnectionTestResult>> action,
+        string actionName,
+        CancellationToken cancellationToken)
+    {
+        var tv = await _repository.GetByIdAsync(id, cancellationToken);
+        if (tv is null)
+            return TvConnectionTestResult.Failed("Smart TV tidak ditemukan.");
+
+        var validation = ValidateConnectionFields(tv.IpAddress, tv.MacAddress, tv.WsPort, tv.Token);
+        if (!validation.Success)
+            return TvConnectionTestResult.Failed(validation.ErrorMessage ?? "Data tidak valid.");
+
+        var result = await action(
+            tv.IpAddress.Trim(),
+            NormalizeMac(tv.MacAddress),
+            tv.WsPort,
+            NormalizeToken(tv.Token),
+            cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(result.Token)
+            && !string.Equals(result.Token, tv.Token, StringComparison.Ordinal))
+        {
+            await _repository.UpdateTokenAsync(id, result.Token, cancellationToken);
+            AppLog.Info($"Smart TV token updated after {actionName}: {tv.Name}");
         }
 
         return result;

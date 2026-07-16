@@ -8,29 +8,18 @@ public interface ITvModelRepository
     Task<IReadOnlyList<TvModelListItem>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TvModelListItem>> GetActiveAsync(CancellationToken cancellationToken = default);
     Task<TvModel?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
-    Task<SleepTimerProfile?> GetSleepProfileBySmartTvIdAsync(
-        int smartTvId,
-        CancellationToken cancellationToken = default);
     Task<bool> CodeExistsAsync(string code, int? excludeId = null, CancellationToken cancellationToken = default);
     Task<bool> IsUsedBySmartTvAsync(int modelId, CancellationToken cancellationToken = default);
     Task CreateAsync(
         string code,
         string name,
         string brand,
-        string sleepTimerMode,
-        int sleepTimerMinutes,
-        double sleepTimerKeyDelaySeconds,
-        string sleepTimerConfirmKeys,
         CancellationToken cancellationToken = default);
     Task UpdateAsync(
         int id,
         string code,
         string name,
         string brand,
-        string sleepTimerMode,
-        int sleepTimerMinutes,
-        double sleepTimerKeyDelaySeconds,
-        string sleepTimerConfirmKeys,
         bool isActive,
         CancellationToken cancellationToken = default);
     Task DeactivateAsync(int id, CancellationToken cancellationToken = default);
@@ -52,7 +41,7 @@ public sealed class TvModelRepository : ITvModelRepository
 
         await using var command = new SqlCommand(
             """
-            SELECT Id, Code, Name, Brand, SleepTimerMode, SleepTimerMinutes, SleepTimerConfirmKeys, IsActive
+            SELECT Id, Code, Name, Brand, IsActive
             FROM TvModels
             ORDER BY Code
             """,
@@ -68,7 +57,7 @@ public sealed class TvModelRepository : ITvModelRepository
 
         await using var command = new SqlCommand(
             """
-            SELECT Id, Code, Name, Brand, SleepTimerMode, SleepTimerMinutes, SleepTimerConfirmKeys, IsActive
+            SELECT Id, Code, Name, Brand, IsActive
             FROM TvModels
             WHERE IsActive = 1
             ORDER BY Code
@@ -85,9 +74,7 @@ public sealed class TvModelRepository : ITvModelRepository
 
         await using var command = new SqlCommand(
             """
-            SELECT
-                Id, Code, Name, Brand, SleepTimerMode, SleepTimerMinutes,
-                SleepTimerKeyDelaySeconds, SleepTimerConfirmKeys, IsActive
+            SELECT Id, Code, Name, Brand, IsActive
             FROM TvModels
             WHERE Id = @Id
             """,
@@ -104,47 +91,7 @@ public sealed class TvModelRepository : ITvModelRepository
             Code = reader.GetString(1),
             Name = reader.GetString(2),
             Brand = reader.GetString(3),
-            SleepTimerMode = reader.GetString(4),
-            SleepTimerMinutes = reader.GetInt32(5),
-            SleepTimerKeyDelaySeconds = (double)reader.GetDecimal(6),
-            SleepTimerConfirmKeys = reader.GetString(7),
-            IsActive = reader.GetBoolean(8)
-        };
-    }
-
-    public async Task<SleepTimerProfile?> GetSleepProfileBySmartTvIdAsync(
-        int smartTvId,
-        CancellationToken cancellationToken = default)
-    {
-        await using var connection = _connectionFactory.Create();
-        await connection.OpenAsync(cancellationToken);
-
-        await using var command = new SqlCommand(
-            """
-            SELECT
-                m.Code,
-                m.SleepTimerMode,
-                m.SleepTimerMinutes,
-                m.SleepTimerKeyDelaySeconds,
-                m.SleepTimerConfirmKeys
-            FROM SmartTvs t
-            INNER JOIN TvModels m ON m.Id = t.ModelId AND m.IsActive = 1
-            WHERE t.Id = @SmartTvId
-            """,
-            connection);
-        command.Parameters.AddWithValue("@SmartTvId", smartTvId);
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-            return null;
-
-        return new SleepTimerProfile
-        {
-            ModelCode = reader.GetString(0),
-            Mode = reader.GetString(1),
-            Minutes = reader.GetInt32(2),
-            KeyDelaySeconds = (double)reader.GetDecimal(3),
-            ConfirmKeys = SleepTimerProfile.ParseConfirmKeys(reader.GetString(4))
+            IsActive = reader.GetBoolean(4)
         };
     }
 
@@ -194,30 +141,21 @@ public sealed class TvModelRepository : ITvModelRepository
         string code,
         string name,
         string brand,
-        string sleepTimerMode,
-        int sleepTimerMinutes,
-        double sleepTimerKeyDelaySeconds,
-        string sleepTimerConfirmKeys,
         CancellationToken cancellationToken = default)
     {
         await using var connection = _connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);
 
+        // SleepTimer* columns tetap di DB (DEFAULT); tidak diisi dari form.
         await using var command = new SqlCommand(
             """
-            INSERT INTO TvModels
-                (Code, Name, Brand, SleepTimerMode, SleepTimerMinutes, SleepTimerKeyDelaySeconds, SleepTimerConfirmKeys)
-            VALUES
-                (@Code, @Name, @Brand, @SleepTimerMode, @SleepTimerMinutes, @SleepTimerKeyDelaySeconds, @SleepTimerConfirmKeys)
+            INSERT INTO TvModels (Code, Name, Brand)
+            VALUES (@Code, @Name, @Brand)
             """,
             connection);
         command.Parameters.AddWithValue("@Code", code);
         command.Parameters.AddWithValue("@Name", name);
         command.Parameters.AddWithValue("@Brand", brand);
-        command.Parameters.AddWithValue("@SleepTimerMode", sleepTimerMode);
-        command.Parameters.AddWithValue("@SleepTimerMinutes", sleepTimerMinutes);
-        command.Parameters.AddWithValue("@SleepTimerKeyDelaySeconds", (decimal)sleepTimerKeyDelaySeconds);
-        command.Parameters.AddWithValue("@SleepTimerConfirmKeys", sleepTimerConfirmKeys);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -227,26 +165,19 @@ public sealed class TvModelRepository : ITvModelRepository
         string code,
         string name,
         string brand,
-        string sleepTimerMode,
-        int sleepTimerMinutes,
-        double sleepTimerKeyDelaySeconds,
-        string sleepTimerConfirmKeys,
         bool isActive,
         CancellationToken cancellationToken = default)
     {
         await using var connection = _connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);
 
+        // Jangan rewrite kolom SleepTimer* — biarkan nilai lama di DB.
         await using var command = new SqlCommand(
             """
             UPDATE TvModels
             SET Code = @Code,
                 Name = @Name,
                 Brand = @Brand,
-                SleepTimerMode = @SleepTimerMode,
-                SleepTimerMinutes = @SleepTimerMinutes,
-                SleepTimerKeyDelaySeconds = @SleepTimerKeyDelaySeconds,
-                SleepTimerConfirmKeys = @SleepTimerConfirmKeys,
                 IsActive = @IsActive,
                 UpdatedAt = SYSUTCDATETIME()
             WHERE Id = @Id
@@ -256,10 +187,6 @@ public sealed class TvModelRepository : ITvModelRepository
         command.Parameters.AddWithValue("@Code", code);
         command.Parameters.AddWithValue("@Name", name);
         command.Parameters.AddWithValue("@Brand", brand);
-        command.Parameters.AddWithValue("@SleepTimerMode", sleepTimerMode);
-        command.Parameters.AddWithValue("@SleepTimerMinutes", sleepTimerMinutes);
-        command.Parameters.AddWithValue("@SleepTimerKeyDelaySeconds", (decimal)sleepTimerKeyDelaySeconds);
-        command.Parameters.AddWithValue("@SleepTimerConfirmKeys", sleepTimerConfirmKeys);
         command.Parameters.AddWithValue("@IsActive", isActive);
 
         var rows = await command.ExecuteNonQueryAsync(cancellationToken);
@@ -301,10 +228,7 @@ public sealed class TvModelRepository : ITvModelRepository
                 Code = reader.GetString(1),
                 Name = reader.GetString(2),
                 Brand = reader.GetString(3),
-                SleepTimerMode = reader.GetString(4),
-                SleepTimerMinutes = reader.GetInt32(5),
-                SleepTimerConfirmKeys = reader.GetString(6),
-                IsActive = reader.GetBoolean(7)
+                IsActive = reader.GetBoolean(4)
             });
         }
 
