@@ -1,0 +1,88 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:rental_ps_smart_billing.ViewModels"
+        xmlns:models="using:rental_ps_smart_billing.Models"
+        x:Class="rental_ps_smart_billing.Views.SessionEndedSummaryWindow"
+        x:DataType="vm:SessionEndedSummaryViewModel"
+        Title="{Binding Title}"
+        Width="440" Height="420"
+        MinHeight="280"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="#FAFAFA">
+
+    <Border Margin="20" Padding="16" Background="White" CornerRadius="8">
+        <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="14">
+            <StackPanel Grid.Row="0" Spacing="6">
+                <TextBlock Text="{Binding Title}"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="#1A237E"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Headline}"
+                           Foreground="#546E7A"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Grid.Row="1"
+                    BorderBrush="#CFD8DC"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Background="#FAFAFA">
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Items}" Margin="12,8">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:AutoEndedSessionItem">
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock Text="{Binding TvName}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#37474F"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding CustomerDisplay, StringFormat=Customer: {0}}"
+                                                   FontSize="12"
+                                                   Foreground="#78909C" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding AmountDisplay}"
+                                               FontWeight="Bold"
+                                               Foreground="#E65100"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding FooterHint}"
+                           FontSize="12"
+                           Foreground="#78909C"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Right">
+                    <TextBlock Text="Total"
+                               FontSize="12"
+                               Foreground="#78909C"
+                               HorizontalAlignment="Right" />
+                    <TextBlock Text="{Binding TotalAmountDisplay}"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="#E65100"
+                               HorizontalAlignment="Right" />
+                </StackPanel>
+            </Grid>
+
+            <Button Grid.Row="3"
+                    Content="OK"
+                    Command="{Binding CloseCommand}"
+                    HorizontalAlignment="Stretch"
+                    Height="36"
+                    Background="#1565C0"
+                    Foreground="White"
+                    FontWeight="SemiBold" />
+        </Grid>
+    </Border>
+</Window>

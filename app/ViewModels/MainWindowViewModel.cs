@@ -23,6 +23,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _isRefreshing;
     private bool _disposed;
     private bool _isSendingSessionWarn;
+    private bool _isShowingAutoEndSummary;
+    private readonly List<AutoEndedSessionItem> _pendingAutoEnded = [];
     private CancellationTokenSource? _tvStatusCts;
 
     public MainWindowViewModel(
@@ -84,10 +86,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (_billingService is null)
             return;
 
+        IReadOnlyList<AutoEndedSessionItem> ended = [];
         IsBusy = true;
         try
         {
-            await _billingService.AutoEndExpiredAsync(cancellationToken);
+            ended = await _billingService.AutoEndExpiredAsync(cancellationToken);
             var cards = await _billingService.GetDashboardAsync(cancellationToken);
             Units.Clear();
             foreach (var card in cards)
@@ -105,9 +108,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     PowerOffUnitAsync));
             }
 
-            StatusMessage = Units.Count == 0
-                ? "Belum ada Smart TV aktif. Tambah TV lewat menu Smart TV."
-                : string.Empty;
+            if (ended.Count > 0)
+                StatusMessage = FormatAutoEndedStatus(ended);
+            else if (Units.Count == 0)
+                StatusMessage = "Belum ada Smart TV aktif. Tambah TV lewat menu Smart TV.";
+            else
+                StatusMessage = string.Empty;
 
             _ = RefreshTvOnlineStatusesAsync();
         }
@@ -120,6 +126,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             IsBusy = false;
         }
+
+        await ShowAutoEndedSummaryAsync(ended);
     }
 
     private async Task RefreshTvOnlineStatusesAsync()
@@ -185,12 +193,53 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 unit.MarkStopped();
             }
 
-            await _billingService.AutoEndExpiredAsync();
+            // Auto-end + satu dialog ringkasan tagihan (bisa banyak TV sekaligus)
             await LoadDashboardAsync();
         }
         finally
         {
             _isRefreshing = false;
+        }
+    }
+
+
+    private static string FormatAutoEndedStatus(IReadOnlyList<AutoEndedSessionItem> ended)
+    {
+        var total = ended.Sum(i => i.Amount);
+        return ended.Count == 1
+            ? $"Sesi selesai: {ended[0].TvName} — {ended[0].AmountDisplay}"
+            : $"{ended.Count} sesi selesai — total Rp {total:N0}";
+    }
+
+    private async Task ShowAutoEndedSummaryAsync(IReadOnlyList<AutoEndedSessionItem> ended)
+    {
+        if (ended.Count == 0 || _ownerWindow is null)
+            return;
+
+        if (_isShowingAutoEndSummary)
+        {
+            _pendingAutoEnded.AddRange(ended);
+            return;
+        }
+
+        _isShowingAutoEndSummary = true;
+        try
+        {
+            var batch = ended.ToList();
+            while (batch.Count > 0)
+            {
+                await DialogHelper.ShowSessionEndedSummaryAsync(_ownerWindow, batch);
+                batch = _pendingAutoEnded.ToList();
+                _pendingAutoEnded.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("Failed to show auto-end summary dialog", ex);
+        }
+        finally
+        {
+            _isShowingAutoEndSummary = false;
         }
     }
 

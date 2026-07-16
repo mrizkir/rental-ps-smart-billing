@@ -53,6 +53,18 @@ public interface ITvApiClient
         bool showWarning,
         string message,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Push/clear session HUD (paket + countdown) for Tizen app (GET /api/tv-session).
+    /// </summary>
+    Task<TvConnectionTestResult> SetTvSessionOverlayAsync(
+        int tvId,
+        bool active,
+        string? packageName = null,
+        string? customerName = null,
+        string billingMode = BillingModes.Fixed,
+        DateTime? endsAtUtc = null,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class TvApiClient : ITvApiClient, IDisposable
@@ -176,6 +188,47 @@ public sealed class TvApiClient : ITvApiClient, IDisposable
         {
             AppLog.Error("TV API api/tv-notification failed", ex);
             return TvConnectionTestResult.Failed($"Gagal set notifikasi TV: {ex.Message}");
+        }
+    }
+
+    public async Task<TvConnectionTestResult> SetTvSessionOverlayAsync(
+        int tvId,
+        bool active,
+        string? packageName = null,
+        string? customerName = null,
+        string billingMode = BillingModes.Fixed,
+        DateTime? endsAtUtc = null,
+        CancellationToken cancellationToken = default)
+    {
+        var health = await EnsureHealthyAsync(cancellationToken);
+        if (!health.Success)
+            return health;
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["tv_id"] = tvId,
+            ["active"] = active,
+            ["package_name"] = packageName ?? string.Empty,
+            ["customer_name"] = customerName ?? string.Empty,
+            ["billing_mode"] = string.IsNullOrWhiteSpace(billingMode)
+                ? BillingModes.Fixed
+                : billingMode,
+            ["ends_at"] = endsAtUtc?.ToUniversalTime().ToString("o")
+        };
+
+        try
+        {
+            using var response = await _httpClient.PostAsJsonAsync(
+                "api/tv-session",
+                payload,
+                cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return ParseResult(body);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("TV API api/tv-session failed", ex);
+            return TvConnectionTestResult.Failed($"Gagal set overlay sesi TV: {ex.Message}");
         }
     }
 

@@ -10,42 +10,157 @@ body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: transparent;
+    background-color: #070a12;
 }
 
-#idle-overlay {
+/* —— Halaman depan (HOME) —— */
+#home-screen {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
+    inset: 0;
     display: none;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.85);
+    z-index: 100;
+    background: radial-gradient(ellipse at 50% 35%, #152038 0%, #070a12 62%, #05070d 100%);
     color: #ffffff;
     text-align: center;
-    z-index: 100;
-    padding: 40px;
+    padding: 48px;
 }
 
-#idle-overlay.show {
+#home-screen.show {
     display: flex;
 }
 
-#idle-overlay h1 {
-    font-size: 72px;
-    font-weight: bold;
-    margin-bottom: 24px;
-    letter-spacing: 1px;
+.home-glow {
+    position: absolute;
+    width: 55vw;
+    height: 55vw;
+    max-width: 900px;
+    max-height: 900px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 180, 255, 0.14) 0%, transparent 70%);
+    pointer-events: none;
 }
 
-#idle-overlay p {
-    font-size: 40px;
-    color: #dddddd;
-    max-width: 80%;
+.home-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 90vw;
+}
+
+.home-logo {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    margin-bottom: 28px;
+    border-radius: 28px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.home-brand {
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #8fa4c0;
+    margin-bottom: 36px;
+}
+
+.home-clock {
+    font-size: 120px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    color: #ffffff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 48px rgba(0, 180, 255, 0.25);
+    margin-bottom: 12px;
+}
+
+.home-date {
+    font-size: 36px;
+    color: #a8b8cc;
+    margin-bottom: 40px;
+    text-transform: capitalize;
+}
+
+.home-divider {
+    width: 120px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, #00b4ff, transparent);
+    margin-bottom: 40px;
+}
+
+.home-title {
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-bottom: 18px;
+}
+
+.home-subtitle {
+    font-size: 34px;
+    color: #b0bec5;
+    max-width: 70%;
     line-height: 1.4;
+}
+
+/* —— HUD paket + countdown —— */
+#session-hud {
+    position: fixed;
+    top: 36px;
+    right: 40px;
+    z-index: 150;
+    min-width: 280px;
+    padding: 18px 28px;
+    border-radius: 16px;
+    background: rgba(7, 10, 18, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    color: #ffffff;
+    text-align: right;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+#session-hud.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+#session-hud.warning {
+    border-color: rgba(255, 140, 0, 0.7);
+    background: rgba(40, 22, 0, 0.78);
+}
+
+.session-package {
+    font-size: 28px;
+    font-weight: 600;
+    color: #cfd8dc;
+    margin-bottom: 6px;
+    max-width: 420px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-countdown {
+    font-size: 52px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    color: #ffffff;
+}
+
+#session-hud.warning .session-countdown {
+    color: #ffb74d;
 }
 
 #warning-banner {

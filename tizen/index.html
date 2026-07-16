@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <meta name="description" content="Rental PS Smart Billing - Tizen TV overlay"/>
+    <meta name="description" content="Rental PS Smart Billing - Tizen TV home overlay"/>
 
     <title>Rental PS Smart Billing</title>
 
@@ -12,10 +12,26 @@
 </head>
 
 <body>
-  <div id="idle-overlay">
-    <h1>Sesi Belum Dimulai</h1>
-    <p>Silakan hubungi operator untuk memulai sesi bermain</p>
+  <!-- Halaman depan (pengganti HOME). Disembunyikan saat sesi aktif / sinyal HDMI. -->
+  <div id="home-screen" class="show">
+    <div class="home-glow" aria-hidden="true"></div>
+    <div class="home-content">
+      <img class="home-logo" src="icon.png" alt="Logo" />
+      <p class="home-brand">Rental PS Smart Billing</p>
+      <p id="home-clock" class="home-clock">--:--:--</p>
+      <p id="home-date" class="home-date">—</p>
+      <div class="home-divider" aria-hidden="true"></div>
+      <h1 class="home-title">Siap Digunakan</h1>
+      <p class="home-subtitle">Hubungi operator untuk memulai sesi bermain</p>
+    </div>
   </div>
+
+  <!-- HUD sesi: nama paket + countdown (pojok kanan atas) -->
+  <div id="session-hud">
+    <p id="session-package" class="session-package">—</p>
+    <p id="session-countdown" class="session-countdown">--:--:--</p>
+  </div>
+
   <div id="warning-banner"></div>
 </body>
 </html>

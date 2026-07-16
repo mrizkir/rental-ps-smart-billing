@@ -35,7 +35,7 @@ public interface IBillingService
         int smartTvId,
         string? overlayMessage = null,
         CancellationToken cancellationToken = default);
-    Task AutoEndExpiredAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AutoEndedSessionItem>> AutoEndExpiredAsync(CancellationToken cancellationToken = default);
     Task<RevenueReportResult> GetRevenueReportAsync(
         DateTime fromLocalDate,
         DateTime toLocalDate,
@@ -116,6 +116,14 @@ public sealed class BillingService : IBillingService
             cancellationToken);
 
         AppLog.Info($"Session started: TV={tv.Name}, package={package.Name}, mode={package.BillingMode}, customer={name}");
+
+        await PushSessionOverlayAsync(
+            smartTvId,
+            package.Name,
+            name,
+            package.BillingMode,
+            endsAt,
+            cancellationToken);
 
         string? warning = null;
         var token = tv.Token;
@@ -209,6 +217,17 @@ public sealed class BillingService : IBillingService
 
         await _sessions.ExtendAsync(sessionId, newEndsAt, newAmount, cancellationToken);
 
+        var packageLabel = string.IsNullOrWhiteSpace(session.PackageName)
+            ? label
+            : session.PackageName;
+        await PushSessionOverlayAsync(
+            session.SmartTvId,
+            packageLabel,
+            session.CustomerName,
+            BillingModes.Fixed,
+            newEndsAt,
+            cancellationToken);
+
         var tv = await _smartTvs.GetByIdAsync(session.SmartTvId, cancellationToken);
         string? warning = null;
         if (tv is not null)
@@ -252,6 +271,14 @@ public sealed class BillingService : IBillingService
         await _sessions.ConvertToFreePlayAsync(sessionId, package.Id, openEndedFrom, cancellationToken);
 
         var prepaid = session.Amount ?? 0;
+        await PushSessionOverlayAsync(
+            session.SmartTvId,
+            package.Name,
+            session.CustomerName,
+            BillingModes.OpenEnded,
+            endsAtUtc: null,
+            cancellationToken);
+
         string? warning = null;
         var tv = await _smartTvs.GetByIdAsync(session.SmartTvId, cancellationToken);
         if (tv is not null)
@@ -305,6 +332,8 @@ public sealed class BillingService : IBillingService
         // Persist completion first so dashboard/timer can stop before TV power-off.
         await _sessions.CompleteAsync(sessionId, endedAt, amount, cancellationToken);
         AppLog.Info($"Session ended: id={sessionId}, amount={amount}");
+
+        await ClearSessionOverlayAsync(session.SmartTvId, cancellationToken);
 
         string? warning = null;
         var tv = await _smartTvs.GetByIdAsync(session.SmartTvId, cancellationToken);
@@ -361,6 +390,50 @@ public sealed class BillingService : IBillingService
         }
     }
 
+    private async Task PushSessionOverlayAsync(
+        int smartTvId,
+        string packageName,
+        string? customerName,
+        string billingMode,
+        DateTime? endsAtUtc,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _tvApi.SetTvSessionOverlayAsync(
+                smartTvId,
+                active: true,
+                packageName,
+                customerName,
+                billingMode,
+                endsAtUtc,
+                cancellationToken);
+            if (!result.Success)
+                AppLog.Warn($"Session overlay push failed for TV id={smartTvId}: {result.Message}");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Session overlay push failed for TV id={smartTvId}", ex);
+        }
+    }
+
+    private async Task ClearSessionOverlayAsync(int smartTvId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _tvApi.SetTvSessionOverlayAsync(
+                smartTvId,
+                active: false,
+                cancellationToken: cancellationToken);
+            if (!result.Success)
+                AppLog.Warn($"Session overlay clear failed for TV id={smartTvId}: {result.Message}");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Session overlay clear failed for TV id={smartTvId}", ex);
+        }
+    }
+
     private async Task<string?> PersistTokenAsync(
         int smartTvId,
         string? currentToken,
@@ -376,21 +449,45 @@ public sealed class BillingService : IBillingService
         return result.Token;
     }
 
-    public async Task AutoEndExpiredAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AutoEndedSessionItem>> AutoEndExpiredAsync(
+        CancellationToken cancellationToken = default)
     {
         var expired = await _sessions.GetExpiredActiveAsync(cancellationToken);
+        if (expired.Count == 0)
+            return [];
+
+        var ended = new List<AutoEndedSessionItem>(expired.Count);
         foreach (var session in expired)
         {
             try
             {
-                await EndSessionAsync(session.Id, cancellationToken);
-                AppLog.Info($"Auto-ended expired session {session.Id}");
+                var tv = await _smartTvs.GetByIdAsync(session.SmartTvId, cancellationToken);
+                var tvName = tv?.Name ?? $"TV #{session.SmartTvId}";
+                var result = await EndSessionAsync(session.Id, cancellationToken);
+                if (!result.Success)
+                {
+                    AppLog.Error(
+                        $"Failed to auto-end session {session.Id}: {result.ErrorMessage}");
+                    continue;
+                }
+
+                ended.Add(new AutoEndedSessionItem
+                {
+                    SessionId = session.Id,
+                    TvName = tvName,
+                    CustomerName = session.CustomerName,
+                    Amount = result.Amount ?? session.Amount ?? 0,
+                    WarningMessage = result.WarningMessage
+                });
+                AppLog.Info($"Auto-ended expired session {session.Id}, amount={result.Amount}");
             }
             catch (Exception ex)
             {
                 AppLog.Error($"Failed to auto-end session {session.Id}", ex);
             }
         }
+
+        return ended;
     }
 
     public async Task<RevenueReportResult> GetRevenueReportAsync(

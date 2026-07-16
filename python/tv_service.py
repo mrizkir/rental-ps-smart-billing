@@ -7,12 +7,15 @@ from flask_cors import CORS
 from config import (
     FLASK_HOST,
     FLASK_PORT,
+    SPLASH_PORT,
+    SPLASH_PUBLIC_IP,
     TV_WS_PORT,
 )
 from ps4_controller import PS4Controller
 from splash_server import SplashServer
 from tv_controller import SamsungTVController
 from tv_notification_store import consume_notification, set_notification
+from tv_session_overlay_store import get_session_overlay, set_session_overlay
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,6 +83,138 @@ def _tv_action(action, *, failure_status: int = 500):
     except ValueError as exc:
         return jsonify({"success": False, "message": str(exc)}), 400
     return jsonify(result), 200 if result["success"] else failure_status
+
+
+@app.route("/", methods=["GET"])
+def index():
+    """Halaman keterangan saat dibuka di browser (bukan 404 kosong)."""
+    return f"""<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TV Service — Rental PS Smart Billing</title>
+  <style>
+    :root {{
+      --bg: #eceff1;
+      --card: #ffffff;
+      --ink: #37474f;
+      --muted: #78909c;
+      --accent: #1a237e;
+      --ok: #2e7d32;
+      --border: #cfd8dc;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: linear-gradient(160deg, #eceff1 0%, #cfd8dc 100%);
+      color: var(--ink);
+      padding: 32px 20px;
+    }}
+    main {{
+      max-width: 640px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 28px 24px;
+      box-shadow: 0 8px 24px rgba(55, 71, 79, 0.08);
+    }}
+    h1 {{
+      margin: 0 0 6px;
+      font-size: 1.45rem;
+      color: var(--accent);
+    }}
+    .status {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0 20px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #e8f5e9;
+      color: var(--ok);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }}
+    .status::before {{
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+    }}
+    p {{ margin: 0 0 14px; line-height: 1.5; color: var(--ink); }}
+    .muted {{ color: var(--muted); font-size: 0.92rem; }}
+    h2 {{
+      margin: 22px 0 10px;
+      font-size: 1rem;
+      color: var(--accent);
+    }}
+    ul {{
+      margin: 0;
+      padding-left: 1.2rem;
+      line-height: 1.7;
+    }}
+    code {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.88em;
+      background: #f5f7f8;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }}
+    .meta {{
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 0.88rem;
+      color: var(--muted);
+    }}
+    a {{ color: #1565c0; }}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>TV Service</h1>
+    <p class="muted">Rental PS Smart Billing — layanan kontrol Smart TV / PS</p>
+    <div class="status">Berjalan</div>
+    <p>
+      Ini API backend untuk aplikasi kasir desktop dan overlay Tizen di TV.
+      Buka endpoint di bawah, jangan mengandalkan halaman ini untuk kontrol TV.
+    </p>
+
+    <h2>Endpoint utama</h2>
+    <ul>
+      <li><code>GET /health</code> — cek layanan hidup</li>
+      <li><code>POST /tv/power-on</code> / <code>/tv/power-off</code> — nyala / mati TV</li>
+      <li><code>POST /tv/set-hdmi</code> — pindah HDMI</li>
+      <li><code>POST /tv/send-key</code> — kirim remote key</li>
+      <li><code>POST /tv/open-browser</code> — buka URL di browser TV</li>
+      <li><code>GET /tv/status</code> — status koneksi TV</li>
+      <li><code>POST /ps4/power-on</code> — Wake-on-LAN PS4</li>
+      <li><code>GET/POST /api/tv-notification</code> — banner peringatan ke overlay Tizen</li>
+      <li><code>GET/POST /api/tv-session</code> — HUD paket + countdown di Tizen</li>
+      <li><code>POST /splash/show</code> — tampilkan splash sewa di TV</li>
+    </ul>
+
+    <h2>Konfigurasi saat ini</h2>
+    <ul>
+      <li>Host: <code>{FLASK_HOST}</code></li>
+      <li>Port: <code>{FLASK_PORT}</code></li>
+      <li>Splash public IP: <code>{SPLASH_PUBLIC_IP}</code>:{SPLASH_PORT}</li>
+      <li>TV WebSocket default port: <code>{TV_WS_PORT}</code></li>
+    </ul>
+
+    <p class="meta">
+      Cek cepat: <a href="/health">/health</a>
+    </p>
+  </main>
+</body>
+</html>
+""", 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 @app.route("/health", methods=["GET"])
@@ -177,6 +312,44 @@ def tv_notification_post():
         tv_id if tv_id is not None else "default",
         payload["show_warning"],
         payload["message"],
+    )
+    return jsonify({"success": True, **payload})
+
+
+@app.route("/api/tv-session", methods=["GET"])
+def tv_session_get():
+    """Polled by Tizen HUD. Does not consume — countdown needs continuous state."""
+    tv_id = request.args.get("tv_id")
+    payload = get_session_overlay(tv_id)
+    return jsonify(payload)
+
+
+@app.route("/api/tv-session", methods=["POST"])
+def tv_session_post():
+    """Set/clear by desktop billing app when session starts, extends, or ends."""
+    data = request.get_json(silent=True) or {}
+    tv_id = data.get("tv_id")
+    active = bool(data.get("active", False))
+    package_name = data.get("package_name") or ""
+    customer_name = data.get("customer_name") or ""
+    billing_mode = data.get("billing_mode") or "Fixed"
+    ends_at = data.get("ends_at")
+
+    payload = set_session_overlay(
+        tv_id,
+        active=active,
+        package_name=str(package_name),
+        customer_name=str(customer_name),
+        billing_mode=str(billing_mode),
+        ends_at=str(ends_at) if ends_at else None,
+    )
+    logger.info(
+        "TV session overlay POST tv_id=%s active=%s package=%s ends_at=%s mode=%s",
+        tv_id if tv_id is not None else "default",
+        payload["active"],
+        payload.get("package_name") or "",
+        payload.get("ends_at"),
+        payload.get("billing_mode"),
     )
     return jsonify({"success": True, **payload})
 

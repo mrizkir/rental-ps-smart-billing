@@ -1,6 +1,17 @@
 from unittest.mock import MagicMock, patch
 
 
+class TestIndexEndpoint:
+    def test_index_returns_info_page(self, flask_client):
+        response = flask_client.get("/")
+
+        assert response.status_code == 200
+        assert "text/html" in response.content_type
+        body = response.get_data(as_text=True)
+        assert "TV Service" in body
+        assert "/health" in body
+
+
 class TestHealthEndpoint:
     def test_health_returns_ok(self, flask_client):
         response = flask_client.get("/health")
@@ -271,3 +282,70 @@ class TestTvNotificationEndpoint:
         data = flask_client.get("/api/tv-notification?tv_id=1").get_json()
         assert data["show_warning"] is True
         assert data["message"] == "Waktu hampir habis"
+
+
+class TestTvSessionOverlayEndpoint:
+    def test_get_empty_returns_inactive(self, flask_client):
+        response = flask_client.get("/api/tv-session?tv_id=1")
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["active"] is False
+        assert data["package_name"] == ""
+        assert data["ends_at"] is None
+
+    def test_post_then_get_keeps_state(self, flask_client):
+        post = flask_client.post(
+            "/api/tv-session",
+            json={
+                "tv_id": 1,
+                "active": True,
+                "package_name": "1 Jam",
+                "customer_name": "Guest",
+                "billing_mode": "Fixed",
+                "ends_at": "2026-07-16T14:00:00+00:00",
+            },
+        )
+        assert post.status_code == 200
+        assert post.get_json()["success"] is True
+
+        first = flask_client.get("/api/tv-session?tv_id=1").get_json()
+        assert first["active"] is True
+        assert first["package_name"] == "1 Jam"
+        assert first["ends_at"] == "2026-07-16T14:00:00+00:00"
+
+        # Peek, not consume
+        second = flask_client.get("/api/tv-session?tv_id=1").get_json()
+        assert second["active"] is True
+        assert second["package_name"] == "1 Jam"
+
+    def test_clear_session(self, flask_client):
+        flask_client.post(
+            "/api/tv-session",
+            json={"tv_id": 1, "active": True, "package_name": "1 Jam"},
+        )
+        flask_client.post("/api/tv-session", json={"tv_id": 1, "active": False})
+
+        data = flask_client.get("/api/tv-session?tv_id=1").get_json()
+        assert data["active"] is False
+
+    def test_per_tv_isolation(self, flask_client):
+        flask_client.post(
+            "/api/tv-session",
+            json={"tv_id": 1, "active": True, "package_name": "TV1"},
+        )
+        flask_client.post(
+            "/api/tv-session",
+            json={
+                "tv_id": 2,
+                "active": True,
+                "package_name": "Free Play",
+                "billing_mode": "OpenEnded",
+            },
+        )
+
+        one = flask_client.get("/api/tv-session?tv_id=1").get_json()
+        two = flask_client.get("/api/tv-session?tv_id=2").get_json()
+        assert one["package_name"] == "TV1"
+        assert two["package_name"] == "Free Play"
+        assert two["billing_mode"] == "OpenEnded"
